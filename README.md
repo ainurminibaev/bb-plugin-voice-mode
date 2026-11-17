@@ -6,7 +6,9 @@ branch carries Russian conversational instructions, a compact new-thread launch
 button, microphone-ready greetings, noise controls and honest pending-work status.
 The upstream contribution branch contains only the general waiting/status fix.
 
-Install a reviewed commit from this fork; do not install it alongside the original
+Install stable releases with `bb plugin install git:https://github.com/ainurminibaev/bb-plugin-voice-mode.git@^0.2.0 --yes`.
+BB checks compatible tags; use its Plugins updates screen or `bb plugin update voice-mode`.
+Do not install this fork alongside the original
 under another ID. Preserve existing connection settings. This edition includes the
 customizations in source, so an external patch keeper must not apply them again.
 It does not add a separate memory store or transcript panel. The voice still uses
