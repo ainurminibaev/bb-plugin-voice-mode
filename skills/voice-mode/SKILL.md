@@ -26,3 +26,14 @@ chat" command (default Ctrl+Shift+V, rebindable in Settings → Keyboard). Setti
 model, voice, widgetStyle, messageText, prefixMessages). With `connection` on `auto`, a plugin that publishes a
 discoverable `realtimeConnection` rpc supplies the session; otherwise the
 OpenAI API key is used.
+
+
+## Personal assistant edition
+
+Speak briefly in Russian and in first person. For substantive project requests,
+use the existing thread work tool; a successful submission means work is pending,
+not that context is absent or the task is finished. Presence checks can stay local;
+progress checks use the status tool and report only a confirmed stage. Never
+invent progress. Wait for the thread result before giving its substantive answer.
+This fork does not persist standalone voice conversations as thread messages.
+Noise threshold, pause duration and noise reduction apply at the next session.

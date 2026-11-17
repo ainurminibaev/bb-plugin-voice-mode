@@ -20,9 +20,10 @@ import {
   useComposer,
   useComposers,
   useSettings,
+  useSdk,
 } from "@get-bb/plugin-sdk/app";
 import { isLive, sessionFor, stopAllSessions, subscribeAll, undockedSession, type Phase, type VoiceSession } from "./session";
-import { compactThreadComposers, planCompactHosts, type CompactComposer } from "./compact-hosts";
+import { compactThreadComposers, planCompactHosts, newVoiceThreadRequest, mountNewVoiceButton, type CompactComposer } from "./compact-hosts";
 import { ConnectionPluginsSection } from "./connection-plugins";
 import "./app.css";
 
@@ -560,6 +561,61 @@ function StartVoiceButton({ session, docked }: { session: VoiceSession; docked: 
   );
 }
 
+function NewThreadVoice() {
+  const composer = useComposer();
+  const sdk = useSdk();
+  const navigate = useBbNavigate();
+  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const busy = useRef(false);
+  const mounted = useRef(true);
+  const anchor = useRef<HTMLSpanElement>(null);
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  useEffect(() => anchor.current ? mountNewVoiceButton(anchor.current, setHost) : undefined, []);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+  if (composer.scope.kind !== "new-thread") return null;
+  const projectId = composer.scope.projectId;
+  const selection = composer.selection;
+  const canStart = !!projectId && !!selection && composer.isEmpty && !composer.isSubmitting;
+  async function start() {
+    if (busy.current || !canStart || !projectId || !selection) return;
+    busy.current = true;
+    setStarting(true);
+    setError(null);
+    try {
+      // Forward the exact visible project, environment, model and permissions.
+      // Never replace the draft or guess a machine from the sidebar selection.
+      const thread = await sdk.threads.spawn(newVoiceThreadRequest(projectId, selection));
+      if (!mounted.current) return;
+      const session = sessionFor(thread.id);
+      await session.start();
+      if (!mounted.current) { await session.stop(); return; }
+      navigate.toThread(thread.id);
+    } catch (cause) {
+      if (mounted.current) setError(cause instanceof Error ? cause.message : "Не удалось открыть голосовой разговор.");
+    } finally {
+      busy.current = false;
+      if (mounted.current) setStarting(false);
+    }
+  }
+  const button = (
+      <button type="button" onClick={() => void start()} disabled={!canStart || starting}
+        aria-label="Начать новый голосовой разговор" aria-busy={starting}
+        title={composer.isEmpty ? "Создать новый тред и включить Voice Mode" : "Отправь или очисти черновик, чтобы начать новый голосовой разговор"}
+        className="ml-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-foreground text-background disabled:opacity-50 max-md:pointer-coarse:h-10 max-md:pointer-coarse:w-10">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden className="size-4">
+          {[4, 8, 12, 8, 4].map((h, i) => <rect key={i} x={1.5+i*2.75} y={(16-h)/2} width={1.75} height={h} rx={0.875} />)}
+        </svg>
+        <span className="sr-only">{starting ? "Создаю разговор…" : "Voice Mode"}</span>
+      </button>
+  );
+  return <><span ref={anchor} hidden />{host ? createPortal(button, host) : button}
+    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}</>;
+}
+
 function ThreadComposerVoice({
   threadId,
   canStart,
@@ -661,7 +717,8 @@ function ThreadComposerVoice({
 
   // Empty and idle: our waveform stands in for bb's send button. Live: the
   // pill stands in for bb's mic (and for send, until you type).
-  const showStart = canStart && phase === "off" && !closing;
+  // Starting voice is independent of agent execution; canStart only controls send replacement.
+  const showStart = phase === "off" && !closing;
   const hideSend = canStart && phase !== "error";
   useEffect(() => {
     const root = host?.closest("form");
@@ -855,6 +912,11 @@ function FloatingPill({ session, placement }: { session: VoiceSession; placement
 }
 
 export default definePluginApp((app) => {
+  app.composer.customize({
+    id: "new-thread-voice-mode",
+    scopes: ["new-thread"],
+    banners: [{ id: "start-voice-mode", chrome: "bare", component: NewThreadVoice }],
+  });
   app.composer.customize({
     id: "voice-mode",
     scopes: ["thread"],

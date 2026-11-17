@@ -3,7 +3,7 @@
 // overlay shows a floating pill until you're back. Only one session runs at a
 // time: starting a second ends the first.
 import type { BrowserToServer, ServerToBrowser } from "./server";
-import { BARGE_IN_CHUNKS, BARGE_IN_RMS, Player, startMic } from "./audio";
+import { Player, startMic } from "./audio";
 
 const PLUGIN_ID = "voice-mode";
 
@@ -123,15 +123,11 @@ export class VoiceSession {
             if (this.state.phase === "speaking") this.set({ phase: "listening" });
           };
           try {
-            let loudChunks = 0;
             stopMic = await startMic(message.inputHz, () => this.state.muted, (base64Data, rms) => {
               send({ type: "AUDIO", base64Data });
               this.micLevel = rms;
-              loudChunks = rms > BARGE_IN_RMS ? loudChunks + 1 : 0;
-              if (loudChunks >= BARGE_IN_CHUNKS && player.playing) {
-                player.interrupt();
-                this.set({ phase: "listening" });
-              }
+              // Only server speech detection interrupts playback. Volume alone
+              // mistakes taps, bumps and echo for the user's speech.
             });
             // The user may have ended the session while the permission prompt was open.
             if (ended) {
@@ -139,6 +135,7 @@ export class VoiceSession {
               break;
             }
             this.set({ phase: "listening" });
+            send({ type: "CLIENT_READY" });
           } catch (error) {
             this.set({ caption: `Microphone unavailable: ${error instanceof Error ? error.message : String(error)}` });
             await cleanup("error");
@@ -160,10 +157,10 @@ export class VoiceSession {
           this.set({
             caption:
               message.name === "send_to_agent"
-                ? `Sent to agent: ${message.detail}`
+                ? `В работе: ${message.detail}`
                 : message.name === "stop_agent"
-                  ? "Stopped the agent"
-                  : `Agent: ${message.detail}`,
+                  ? "Работа остановлена"
+                  : `Статус: ${message.detail}`,
           });
           break;
         case "AGENT_STATUS":

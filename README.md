@@ -1,3 +1,30 @@
+# Voice Mode — personal assistant edition
+
+This fork of [Steve Frost’s Voice Mode](https://github.com/steveafrost/bb-plugin-voice-mode)
+keeps the original MIT license and the same plugin ID. The `personal-assistant`
+branch carries Russian conversational instructions, a compact new-thread launch
+button, microphone-ready greetings, noise controls and honest pending-work status.
+The upstream contribution branch contains only the general waiting/status fix.
+
+Install a reviewed commit from this fork; do not install it alongside the original
+under another ID. Preserve existing connection settings. This edition includes the
+customizations in source, so an external patch keeper must not apply them again.
+It does not add a separate memory store or transcript panel. The voice still uses
+existing thread tools for work and summarizes their results; standalone voice chat
+is not automatically saved as thread history.
+
+Voice settings include `vadThreshold` (0.7), `silenceDurationMs` (900),
+`noiseReduction` (`far_field` / `near_field`). Input transcription uses Russian.
+Presence replies stay local, progress uses the status tool, and pending work is
+not evidence of missing context. Spoken phrasing remains model-dependent.
+
+Validation: `npm ci --include=dev`, `npm test`, `npm run typecheck`,
+`bb plugin build .`. Upstream changes must be reviewed and tested before merging
+into this branch. No automatic compatibility with future BB/upstream versions is
+claimed.
+
+## Original documentation
+
 # bb-plugin-voice-mode
 
 Talk to a bb thread hands-free. When a thread's composer is empty and its

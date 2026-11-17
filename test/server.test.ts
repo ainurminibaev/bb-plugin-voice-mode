@@ -1,6 +1,6 @@
 import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import plugin from "../server";
+import plugin, { GREETINGS, pickGreeting } from "../server";
 
 const THREAD = "thr_test123";
 
@@ -97,6 +97,19 @@ async function startSession(options: {
   const toBrowser = () => browser.sent.map((m) => JSON.parse(String(m)) as Record<string, unknown>);
   return { harness, browser, toBrowser, bb };
 }
+
+describe("greeting choices", () => {
+  it("provides thirty distinct greetings and excludes the last at both random boundaries", () => {
+    expect(GREETINGS).toHaveLength(30);
+    expect(new Set(GREETINGS).size).toBe(30);
+    for (const previous of GREETINGS) {
+      for (const random of [() => 0, () => 0.999999]) {
+        expect(pickGreeting(previous, random)).not.toBe(previous);
+        expect(GREETINGS).toContain(pickGreeting(previous, random));
+      }
+    }
+  });
+});
 
 describe("connection", () => {
   it("uses the OpenAI API key and picked model when no plugin provides a connection", async () => {
@@ -205,11 +218,81 @@ describe("session", () => {
     expect(toBrowser()).toContainEqual({ type: "READY", inputHz: 24000, outputHz: 24000 });
   });
 
+  it("greets exactly once after the microphone is ready, without tools or thread context", async () => {
+    const { browser, upstream, harness } = await liveSession();
+    expect(upstream.ofType("response.create")).toHaveLength(0);
+    await browser.receive(JSON.stringify({ type: "CLIENT_READY" }));
+    await browser.receive(JSON.stringify({ type: "CLIENT_READY" }));
+    const responses = upstream.ofType("response.create");
+    expect(responses).toHaveLength(1);
+    expect(responses[0]).toMatchObject({ response: {
+      conversation: "none", input: [], tool_choice: "none",
+      instructions: expect.stringMatching(/Скажи по-русски ровно эту фразу: «.+» Ничего не добавляй/),
+    }});
+    expect(harness.sdk.callsTo("threads.send")).toHaveLength(0);
+  });
+
+  it("does not greet over a user who speaks before microphone readiness", async () => {
+    const { browser, upstream } = await liveSession();
+    upstream.emit({ type: "input_audio_buffer.speech_started" });
+    await browser.receive(JSON.stringify({ type: "CLIENT_READY" }));
+    expect(upstream.ofType("response.create")).toHaveLength(0);
+  });
+
+  it("ignores premature readiness and still greets after a successful connection", async () => {
+    const { browser } = await startSession({ settings: { openaiApiKey: "sk-test" } });
+    const upstream = FakeUpstream.last!;
+    await browser.receive(JSON.stringify({ type: "CLIENT_READY" }));
+    expect(upstream.ofType("response.create")).toHaveLength(0);
+    upstream.open();
+    upstream.emit({ type: "session.updated" });
+    await browser.receive(JSON.stringify({ type: "CLIENT_READY" }));
+    expect(upstream.ofType("response.create")).toHaveLength(1);
+  });
+
+  it("uses Russian and a noise-resistant speech detector while preserving intentional interruptions", async () => {
+    const { upstream } = await liveSession();
+    const [update] = upstream.ofType("session.update") as { session: Record<string, any> }[];
+    expect(update!.session.audio.input).toMatchObject({
+      noise_reduction: { type: "far_field" },
+      transcription: { language: "ru" },
+      turn_detection: { type: "server_vad", threshold: 0.7, silence_duration_ms: 900, interrupt_response: true },
+    });
+    expect(update!.session.instructions).toContain("от первого лица");
+    expect(update!.session.instructions).toContain("один собеседник и один агент");
+    expect(update!.session.instructions).toContain("не знаешь, пока не проверишь");
+    expect(update!.session.instructions).not.toContain("You cannot read files, run commands, or write code yourself");
+  });
+
   it("relays mic audio upstream, dropping oversized frames", async () => {
     const { browser, upstream } = await liveSession();
     await browser.receive(JSON.stringify({ type: "AUDIO", base64Data: "AAAA" }));
     await browser.receive(JSON.stringify({ type: "AUDIO", base64Data: "A".repeat(300_000) }));
     expect(upstream.ofType("input_audio_buffer.append")).toEqual([{ type: "input_audio_buffer.append", audio: "AAAA" }]);
+  });
+
+  it("waiting status never exposes a stale answer as the current result or sends another task", async () => {
+    const { harness, upstream } = await liveSession();
+    harness.sdk.stub("threads.get", async () => ({ status: "active" }));
+    harness.sdk.stub("threads.output", async () => ({ output: "OLD: no project context" }));
+    say(upstream, "u1", "Ты ещё работаешь?");
+    upstream.emit({ type: "response.function_call_arguments.done", call_id: "waiting", name: "get_agent_status", arguments: "{}" });
+    await flush(); await flush();
+    const items = upstream.ofType("conversation.item.create") as any[];
+    const result = items.find(m => m.item.call_id === "waiting").item.output;
+    expect(result).toContain("active");
+    expect(result).not.toContain("OLD");
+    expect(harness.sdk.callsTo("threads.send")).toHaveLength(0);
+  });
+
+  it("finished status still returns the actual result", async () => {
+    const { harness, upstream } = await liveSession();
+    harness.sdk.stub("threads.output", async () => ({ output: "Found the assistant project context." }));
+    say(upstream, "u1", "Как результат?");
+    upstream.emit({ type: "response.function_call_arguments.done", call_id: "finished", name: "get_agent_status", arguments: "{}" });
+    await flush(); await flush();
+    const items = upstream.ofType("conversation.item.create") as any[];
+    expect(items.find(m => m.item.call_id === "finished").item.output).toContain("Found the assistant project context.");
   });
 
   it("forwards what the user said, verbatim, and asks for a reply after the response ends", async () => {
@@ -378,7 +461,7 @@ describe("agent turns", () => {
     const { harness, upstream } = await liveSession();
     await harness.emitThreadEvent("thread.active", { thread: thread("active") });
     await harness.emitThreadEvent("thread.idle", { thread: thread("idle"), lastAssistantText: "All 40 tests pass." });
-    expect(userTexts(upstream).at(-1)).toMatch(/^\[bb update\] The agent finished.*All 40 tests pass/);
+    expect(userTexts(upstream).at(-1)).toMatch(/^\[bb update\] Work finished.*All 40 tests pass/);
     expect(upstream.ofType("response.create")).toEqual([{ type: "response.create", response: { tool_choice: "none" } }]);
   });
 
@@ -405,7 +488,7 @@ describe("agent turns", () => {
       const { harness, upstream, toBrowser } = await liveSession();
       await harness.emitThreadEvent("thread.active", { thread: thread("active") });
       await harness.emitThreadEvent("interaction.pending", { thread: thread("active"), interaction: {} as never });
-      expect(userTexts(upstream).at(-1)).toMatch(/answer it in bb/);
+      expect(userTexts(upstream).at(-1)).toMatch(/answer a question or approve an action in the BB interface/);
       expect(toBrowser()).toContainEqual({ type: "AGENT_STATUS", status: "waiting for you" });
       upstream.emit({ type: "response.done" });
       await vi.advanceTimersByTimeAsync(5 * 60_000 + 15_000);

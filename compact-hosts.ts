@@ -8,6 +8,46 @@
  */
 
 /** What a compact host needs to know about one of bb's composers. */
+import type { ComposerSelection } from "@get-bb/plugin-sdk/app";
+
+/** A visible user-clicked voice start creates a normal thread, never a hidden worker. */
+export function newVoiceThreadRequest(projectId: string, selection: ComposerSelection) {
+  if (!projectId.trim()) throw new Error("Сначала выбери проект.");
+  return {
+    ...selection,
+    projectId,
+    environment: selection.environment ?? { type: "project-default" as const },
+    title: "Голосовой разговор",
+    prompt: "[Voice Mode] Пользователь включил голосовой режим нового разговора. Пока задачи по проекту нет: не запускай команды и не меняй файлы. Коротко подтверди готовность и жди голосового запроса.",
+  };
+}
+
+/** Place the compact new-thread action beside the host mic, with cleanup. */
+export function mountNewVoiceButton(anchor: HTMLElement, onHost: (host: HTMLElement | null) => void): () => void {
+  const shell = anchor.closest("[data-app-composer]") ?? anchor.closest("form");
+  if (!shell) return () => {};
+  const portal = document.createElement("span");
+  portal.className = "voice-mode-host";
+  portal.setAttribute("data-bb-plugin-root", "");
+  portal.setAttribute("data-bb-plugin", "voice-mode");
+  let frame = 0;
+  let current: HTMLElement | null = null;
+  const place = () => {
+    frame = 0;
+    const form = anchor.closest("form") ?? shell.querySelector("form[data-promptbox]");
+    const group = form?.querySelector("[data-promptbox-submit-group]");
+    if (group && portal.nextSibling !== group) group.before(portal);
+    if (!group) portal.remove();
+    const next = portal.isConnected ? portal : null;
+    if (next !== current) { current = next; onHost(next); }
+  };
+  const schedule = () => { if (!frame) frame = requestAnimationFrame(place); };
+  const observer = new MutationObserver(schedule);
+  observer.observe(shell, { childList: true, subtree: true });
+  place();
+  return () => { observer.disconnect(); cancelAnimationFrame(frame); portal.remove(); onHost(null); };
+}
+
 export interface CompactComposer {
   readonly key: string;
   readonly scope: { readonly kind: string; readonly threadId?: string };

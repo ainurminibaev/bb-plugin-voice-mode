@@ -1,12 +1,12 @@
 {
   "name": "bb-plugin-voice-mode",
-  "version": "0.1.15",
+  "version": "0.2.0-personal.1",
   "type": "module",
   "private": true,
   "description": "Talk to a bb thread hands-free: full-duplex, interruptible realtime voice that hands work to the thread's agent.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/steveafrost/bb-plugin-voice-mode.git"
+    "url": "https://github.com/ainurminibaev/bb-plugin-voice-mode.git"
   },
   "license": "MIT",
   "engines": {

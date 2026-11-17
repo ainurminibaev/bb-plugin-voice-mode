@@ -79,3 +79,29 @@ describe("compactThreadComposers", () => {
     expect(kept.map((composer) => composer.key)).toEqual(["a"]);
   });
 });
+
+import { newVoiceThreadRequest } from "../compact-hosts";
+
+describe("new thread voice start", () => {
+  it("preserves the selected machine, environment, provider, model and permissions", () => {
+    const environment = { type: "reuse" as const, environmentId: "environment-example" };
+    const request = newVoiceThreadRequest("project-selected", {
+      projectId: "project-stale", environment, providerId: "codex", model: "selected-model",
+      reasoningLevel: "high", serviceTier: "default", permissionMode: "accept-edits",
+    });
+    expect(request.projectId).toBe("project-selected");
+    expect(request.environment).toEqual(environment);
+    expect(request.providerId).toBe("codex");
+    expect(request.model).toBe("selected-model");
+    expect(request.reasoningLevel).toBe("high");
+    expect(request.serviceTier).toBe("default");
+    expect(request.permissionMode).toBe("accept-edits");
+    expect(request.prompt).toContain("не запускай команды и не меняй файлы");
+  });
+  it("uses the project default environment only when no environment was selected", () => {
+    expect(newVoiceThreadRequest("project-example", {}).environment).toEqual({ type: "project-default" });
+  });
+  it("refuses an unresolved project", () => {
+    expect(() => newVoiceThreadRequest("", {})).toThrow();
+  });
+});
