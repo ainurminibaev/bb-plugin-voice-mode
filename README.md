@@ -1,7 +1,7 @@
 # Voice Mode — personal assistant edition
 
 This fork of [Steve Frost’s Voice Mode](https://github.com/steveafrost/bb-plugin-voice-mode)
-keeps the original MIT license and the same plugin ID. The `personal-assistant`
+keeps the original MIT license and the same plugin ID. The `main`
 branch carries Russian conversational instructions, a compact new-thread launch
 button, microphone-ready greetings, noise controls and honest pending-work status.
 The upstream contribution branch contains only the general waiting/status fix.
@@ -22,7 +22,7 @@ not evidence of missing context. Spoken phrasing remains model-dependent.
 
 Validation: `npm ci --include=dev`, `npm test`, `npm run typecheck`,
 `bb plugin build .`. Upstream changes must be reviewed and tested before merging
-into this branch. No automatic compatibility with future BB/upstream versions is
+into `main`. No automatic compatibility with future BB/upstream versions is
 claimed.
 
 ## Original documentation
