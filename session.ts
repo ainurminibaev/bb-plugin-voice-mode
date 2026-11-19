@@ -92,10 +92,21 @@ export class VoiceSession {
     await run?.();
   }
 
-  async start() {
+  // A settings write may finish after the user hangs up or switches calls.
+  changeVoiceOnSave() {
+    const running = this.teardown;
+    return async () => {
+      if (!running || this.teardown !== running) return;
+      const muted = this.state.muted;
+      await this.stop();
+      await this.start(muted);
+    };
+  }
+
+  async start(muted = false) {
     if (this.teardown) return;
     for (const other of sessions.values()) if (other !== this) await other.stop();
-    this.set({ phase: "connecting", caption: "", route: "", badge: "", agentStatus: null, muted: false });
+    this.set({ phase: "connecting", caption: "", route: "", badge: "", agentStatus: null, muted });
     let stopMic: (() => Promise<void>) | null = null;
     let ended = false;
     const send = (message: BrowserToServer) => {

@@ -848,11 +848,11 @@ describe("Live first with subscription fallback", () => {
 
 
 it("starts 1.1 through Codex without a key and retains the subscription fallback", async () => {
-  const { toBrowser, browser } = await startSession({ subscription: true, settings: { connection: "codex-live-first" } });
+  const { toBrowser, browser } = await startSession({ subscription: true, settings: { connection: "codex-live-first", codexLiveVoice: "juniper" } });
   const first = FakeUpstream.last!;
   expect(first.url).toBe("codex-app-server");
   first.open();
-  expect(first.ofType("session.start")[0]).toMatchObject({ session: { model: "gpt-live-1.1-codex" } });
+  expect(first.ofType("session.start")[0]).toMatchObject({ session: { model: "gpt-live-1.1-codex", audio: { output: { voice: "juniper" } } } });
   first.emit({ type: "session.started" });
   expect(toBrowser()).toContainEqual({ type: "READY", inputHz: 24000, outputHz: 24000, badge: "Live 1.1" });
   first.onclose?.({code:1006, reason:"disconnected"});

@@ -196,7 +196,7 @@ async def run():
             await pc.setLocalDescription(await pc.createOffer())
             await rpc("thread/realtime/start", {"threadId": tid, "model": MODEL, "version": "v3",
                 "outputModality": "audio", "transport": {"type": "webrtc", "sdp": pc.localDescription.sdp},
-                "voice": "cove", "prompt": cfg["instructions"], "includeStartupContext": False,
+                "voice": cfg["audio"]["output"]["voice"], "prompt": cfg["instructions"], "includeStartupContext": False,
                 "clientManagedHandoffs": True, "realtimeStartInstructions": "BB owns all delegated work. Do not act or use tools."})
             spawn(incoming())
             await done.wait()

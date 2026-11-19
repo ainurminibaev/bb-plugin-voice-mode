@@ -252,7 +252,7 @@ On a Linux BB server with Python 3.12, venv and Codex CLI (tested with 0.170.0),
 run `python3 codex_voice.py --install` from the plugin sources as the BB service
 user. Confirm that `codex login status` shows ChatGPT login for that user.
 Choose **codex-live-first**. The **Live 1.1** badge identifies a Codex V3
-WebRTC call requesting `gpt-live-1.1-codex` with Cove. This mode tries the
+WebRTC call requesting `gpt-live-1.1-codex` with the selected voice. This mode tries the
 subscription route each call and falls back to the configured subscription
 Realtime 2.1. The project API key is optional in this mode. The BB thread
 handles spoken tasks. Codex starts an ephemeral voice thread with a read-only
@@ -263,3 +263,5 @@ Short browser network interruptions keep the same upstream call open for up to
 eight seconds. The browser reattaches with a per-call token and replays missed
 output in order. A small playback buffer absorbs ordinary packet jitter.
 Ending the call disconnects immediately when the browser is online.
+
+The voice selector beside the Voice Mode button saves the Codex Live voice. Cove is the default. Selecting Juniper or another voice during a Live 1.1 call starts a fresh call in the same thread with the microphone mute setting preserved.

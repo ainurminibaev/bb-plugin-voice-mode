@@ -18,6 +18,7 @@
 // in the system instructions, responses the backend starts (bb updates, tool
 // follow-ups) cannot call tools, and the user gets one send_to_agent per thing
 // they say.
+import { LIVE_VOICES } from "./live-voices";
 import { resumableCalls } from "./resume";
 import { CodexVoiceSocket } from "./codex-voice-socket";
 import { LiveSession, LIVE_URL } from "./live-session";
@@ -216,7 +217,7 @@ export default function plugin(bb: BbPluginApi) {
       type: "select",
       label: "Connection",
       description:
-        "auto: prefer a realtime connection plugin, if one is installed, such as a company realtime proxy; use the OpenAI API key if none is available or connection resolution fails. plugin: never fall back to the key. codex-live-first: GPT-Live 1.1 via Codex ChatGPT login (Cove), then subscription Realtime 2.1. openai-api-key: Realtime API with the project key. live-first: try GPT-Live-1 on every call, then use ChatGPT Realtime Connection (gpt-realtime-2.1) if unavailable. openai-live: GPT-Live-1 with the project key and client delegation to this thread. Known plugins: realtime-gateway (github.com/steveafrost/bb-plugin-realtime-gateway) and codex-realtime (github.com/gpambrozio/bb-plugins, for ChatGPT subscriptions).",
+        "auto: prefer a realtime connection plugin, if one is installed, such as a company realtime proxy; use the OpenAI API key if none is available or connection resolution fails. plugin: never fall back to the key. codex-live-first: GPT-Live 1.1 via Codex ChatGPT login, then subscription Realtime 2.1. openai-api-key: Realtime API with the project key. live-first: try GPT-Live-1 on every call, then use ChatGPT Realtime Connection (gpt-realtime-2.1) if unavailable. openai-live: GPT-Live-1 with the project key and client delegation to this thread. Known plugins: realtime-gateway (github.com/steveafrost/bb-plugin-realtime-gateway) and codex-realtime (github.com/gpambrozio/bb-plugins, for ChatGPT subscriptions).",
       options: [...CONNECTIONS],
       default: "auto",
     },
@@ -233,6 +234,7 @@ export default function plugin(bb: BbPluginApi) {
       options: [...MODELS],
       default: MODELS[0],
     },
+    codexLiveVoice: { type: "select", label: "Codex Live voice", options: [...LIVE_VOICES], default: "cove" },
     voice: { type: "select", label: "Voice", options: [...VOICES], default: "marin" },
     vadThreshold: {
       type: "number", label: "Speech activation threshold",
@@ -911,7 +913,7 @@ export default function plugin(bb: BbPluginApi) {
       endActiveSession = shutdown;
       if (current.connection === "live-first" && !current.openaiApiKey?.trim()) return switchToSubscription("Ключ Live не задан.");
       const connection = await resolveConnection();
-      if (!closed) connect(connection, current.voice, connection.source.startsWith("plugin"));
+      if (!closed) connect(connection, connection.protocol === "codex-live" ? current.codexLiveVoice : current.voice, connection.source.startsWith("plugin"));
     }
 
     return {

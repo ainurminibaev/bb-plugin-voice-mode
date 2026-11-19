@@ -24,6 +24,7 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import { isLive, sessionFor, stopAllSessions, subscribeAll, undockedSession, type Phase, type VoiceSession } from "./session";
 import { compactThreadComposers, planCompactHosts, newVoiceThreadRequest, mountNewVoiceButton, type CompactComposer } from "./compact-hosts";
+import { LIVE_VOICES } from "./live-voices";
 import { ConnectionPluginsSection } from "./connection-plugins";
 import "./app.css";
 
@@ -345,6 +346,7 @@ function VoicePill({
         {phase === "error" ? <Glyph name="alert" /> : <LevelWave session={session} phase={phase} muted={muted && micActive} />}
         <span className={cn("text-xs font-medium text-foreground/80", phase === "error" && "max-w-72 truncate")}>{status}</span>{badge && phase !== "error" && <span className="rounded border border-current/20 px-1 text-[10px] font-medium tabular-nums">{badge}</span>}
       </span>
+      {badge === "Live 1.1" && <LiveVoicePicker session={session} />}
       {micActive ? (
         <button
           type="button"
@@ -535,11 +537,42 @@ function useSendButtonLook(ref: React.RefObject<HTMLElement | null>) {
   return look;
 }
 
+function LiveVoicePicker({ session, disabled }: { session?: VoiceSession; disabled?: boolean }) {
+  const { values } = useSettings();
+  const sdk = useSdk();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  if (values?.connection !== "codex-live-first") return null;
+  const label = "Голос Live · смена голоса во время звонка перезапустит его";
+  return <span className="inline-flex items-center">
+    <select aria-label={label} title={label} disabled={saving || disabled}
+      className="h-8 cursor-pointer rounded bg-transparent px-1 text-xs text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+      value={String(values.codexLiveVoice ?? "cove")}
+      onChange={async event => {
+        const voice = event.currentTarget.value;
+        const restart = session?.changeVoiceOnSave();
+        setSaving(true);
+        setError("");
+        try {
+          await sdk.plugins.updateSettings({ pluginId: "voice-mode", values: { codexLiveVoice: voice } });
+          await restart?.();
+        } catch {
+          setError("Не удалось переключить голос");
+        } finally {
+          setSaving(false);
+        }
+      }}>
+      {LIVE_VOICES.map(v => <option key={v} value={v}>{v[0].toUpperCase() + v.slice(1)}</option>)}
+    </select>
+    {error && <span role="alert" className="text-xs text-destructive">{error}</span>}
+  </span>;
+}
+
 function StartVoiceButton({ session, docked }: { session: VoiceSession; docked: boolean }) {
   const ref = useRef<HTMLButtonElement>(null);
   const look = useSendButtonLook(ref);
   return (
-    <span className="voice-mode-start ml-1 inline-flex" data-tip="Start new voice chat">
+    <><LiveVoicePicker session={session} /><span className="voice-mode-start ml-1 inline-flex" data-tip="Start new voice chat">
       <button
         ref={ref}
         type="button"
@@ -557,7 +590,7 @@ function StartVoiceButton({ session, docked }: { session: VoiceSession; docked: 
           ))}
         </svg>
       </button>
-    </span>
+    </span></>
   );
 }
 
@@ -602,7 +635,7 @@ function NewThreadVoice() {
     }
   }
   const button = (
-      <button type="button" onClick={() => void start()} disabled={!canStart || starting}
+      <><LiveVoicePicker disabled={starting} /><button type="button" onClick={() => void start()} disabled={!canStart || starting}
         aria-label="Начать новый голосовой разговор" aria-busy={starting}
         title={composer.isEmpty ? "Создать новый тред и включить Voice Mode" : "Отправь или очисти черновик, чтобы начать новый голосовой разговор"}
         className="ml-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-foreground text-background disabled:opacity-50 max-md:pointer-coarse:h-10 max-md:pointer-coarse:w-10">
@@ -610,7 +643,7 @@ function NewThreadVoice() {
           {[4, 8, 12, 8, 4].map((h, i) => <rect key={i} x={1.5+i*2.75} y={(16-h)/2} width={1.75} height={h} rx={0.875} />)}
         </svg>
         <span className="sr-only">{starting ? "Создаю разговор…" : "Voice Mode"}</span>
-      </button>
+      </button></>
   );
   return <><span ref={anchor} hidden />{host ? createPortal(button, host) : button}
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}</>;

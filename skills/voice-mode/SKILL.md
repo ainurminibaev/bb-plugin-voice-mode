@@ -58,3 +58,5 @@ For Codex subscription Live 1.1, install the server bridge with `python3 codex_v
 Brief browser disconnects can resume the same call. The server keeps the call
 for eight seconds and replays missed output within a bounded buffer. After a
 longer outage the caller can start a new call from the same thread.
+
+The voice selector beside the Voice Mode button saves the Codex Live voice. Cove is the default. Selecting Juniper or another voice during a Live 1.1 call starts a fresh call in the same thread with the microphone mute setting preserved.
