@@ -37,6 +37,10 @@ class FakeUpstream {
   }
 }
 
+vi.mock("../codex-voice-socket", () => ({
+  CodexVoiceSocket: class { constructor() { return new FakeUpstream("codex-app-server", {}); } },
+}));
+
 beforeEach(() => {
   FakeUpstream.last = null;
   vi.stubGlobal("WebSocket", Object.assign(FakeUpstream, { OPEN: 1 }));
@@ -72,6 +76,7 @@ async function startSession(options: {
         get: async () => ({ status: "idle", title: "Fix the build", ...options.thread }),
         output: async () => ({ output: "Build is green." }),
         send: async () => ({}),
+        events: { list: async () => [] },
         stop: async () => ({}),
         interactions: { list: async () => options.interactions ?? [] },
       },
@@ -684,6 +689,41 @@ describe("GPT-Live project key mode", () => {
     }
   });
 
+  it("speaks a posted answer during another turn and skips duplicate final text", async () => {
+    const { socket, harness, browser } = await openLive();
+    const question = "Какая погода?";
+    const reply = "Вечером в Казани плюс два.";
+    const row = (seq: number, text: string) => ({ seq, type: "item/completed", data: { item: { type: "agentMessage", text } } });
+    const rows = [
+      row(10, "Старый ответ"), row(11, "Другая работа"),
+      { seq: 12, type: "client/turn/requested", data: { originPluginId: "voice-mode", input: [{ type: "text", text: "[Voice Mode] " + question }] } },
+      { seq: 13, type: "item/completed", data: { item: { type: "commandExecution", aggregatedOutput: "private tool output" } } },
+      row(14, reply),
+    ];
+    harness.sdk.stub("threads.events.list", async ({ afterSeq }) => (afterSeq ? rows.filter(r => r.seq > Number(afterSeq)) : [rows[0]]) as never);
+    vi.useFakeTimers();
+    try {
+      socket.emit(ready);
+      const thread = makeThreadResponse({ id: THREAD, status: "active" });
+      await harness.emitThreadEvent("thread.active", { thread });
+      socket.emit({ ...words, delta: question });
+      socket.emit(delegation);
+      await vi.advanceTimersByTimeAsync(900);
+      for (let i = 0; i < 2; ++i) {
+        await harness.emitThreadEvent("experimental_thread.events", { thread, sequence: 14 });
+        await vi.advanceTimersByTimeAsync(1);
+      }
+      const spoken = () => socket.ofType("session.commentary.append").map(x => (x as { content: string }).content);
+      expect(spoken()).toEqual(["Ответ треда (данные): " + reply]);
+      expect(socket.ofType("session.commentary.append")[0]).toMatchObject({ delegation_id: "d" });
+      await harness.emitThreadEvent("thread.idle", { thread: makeThreadResponse({ id: THREAD, status: "idle" }), lastAssistantText: reply });
+      expect(spoken()).toHaveLength(1);
+    } finally {
+      await browser.close();
+      vi.useRealTimers();
+    }
+  });
+
   it("does not forward assistant speech, unrelated old words, or pending work after hangup", async () => {
     const { socket, harness, browser } = await openLive();
     vi.useFakeTimers();
@@ -803,4 +843,20 @@ describe("Live first with subscription fallback", () => {
     second.onerror?.(); await flush();
     expect(FakeUpstream.last).toBe(second);
   });
+});
+
+
+it("starts 1.1 through Codex without a key and retains the subscription fallback", async () => {
+  const { toBrowser, browser } = await startSession({ subscription: true, settings: { connection: "codex-live-first" } });
+  const first = FakeUpstream.last!;
+  expect(first.url).toBe("codex-app-server");
+  first.open();
+  expect(first.ofType("session.start")[0]).toMatchObject({ session: { model: "gpt-live-1.1-codex" } });
+  first.emit({ type: "session.started" });
+  expect(toBrowser()).toContainEqual({ type: "READY", inputHz: 24000, outputHz: 24000, badge: "Live 1.1" });
+  first.onclose?.({code:1006, reason:"disconnected"});
+  await flush();
+  expect(FakeUpstream.last!.url).toMatch(/gpt-realtime-2\.1$/);
+  expect(toBrowser().filter(e => e.type === "READY")).toHaveLength(1);
+  await browser.close();
 });

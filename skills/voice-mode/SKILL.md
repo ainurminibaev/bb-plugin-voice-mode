@@ -50,3 +50,7 @@ Use Connection → live-first to try the project-key Live session afresh on each
 call and automatically reconnect on the configured codex-realtime 2.1 route
 if Live is unavailable. The indicator reports the fallback. A model switch
 keeps the BB thread and microphone but starts a fresh voice conversation.
+
+During a Live call, a posted assistant reply to a spoken question can be read aloud while the BB thread continues working. Tool output and private reasoning are excluded.
+
+For Codex subscription Live 1.1, install the server bridge with `python3 codex_voice.py --install` and select `codex-live-first`. Verify the Live 1.1 badge, voiced thread reply and Realtime fallback.

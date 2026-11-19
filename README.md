@@ -242,3 +242,19 @@ npm install
 npm run typecheck && npm test
 bb plugin build && bb plugin install . --yes
 ```
+
+During a Live call, a posted assistant reply to a spoken question can be read aloud while the BB thread continues working. Tool output and private reasoning are excluded.
+
+
+### GPT-Live 1.1 through the Codex login
+
+On a Linux BB server with Python 3.12, venv and Codex CLI (tested with 0.170.0),
+run `python3 codex_voice.py --install` from the plugin sources as the BB service
+user. Confirm that `codex login status` shows ChatGPT login for that user.
+Choose **codex-live-first**. The **Live 1.1** badge identifies a Codex V3
+WebRTC call requesting `gpt-live-1.1-codex` with Cove. This mode tries the
+subscription route each call and falls back to the configured subscription
+Realtime 2.1. The project API key is optional in this mode. The BB thread
+handles spoken tasks. Codex starts an ephemeral voice thread with a read-only
+sandbox, and the bridge interrupts automatic backend turns. Audio travels
+through the BB server. Run the installer again after updating the bridge.

@@ -18,6 +18,7 @@
 // in the system instructions, responses the backend starts (bb updates, tool
 // follow-ups) cannot call tools, and the user gets one send_to_agent per thing
 // they say.
+import { CodexVoiceSocket } from "./codex-voice-socket";
 import { LiveSession, LIVE_URL } from "./live-session";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
@@ -45,11 +46,11 @@ const CONNECTION_RPC = "realtimeConnection";
 
 export const MODELS = ["gpt-realtime-2", "gpt-realtime", "gpt-realtime-mini"] as const;
 export const VOICES = ["marin", "cedar", "alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse"] as const;
-export const CONNECTIONS = ["auto", "plugin", "openai-api-key", "openai-live", "live-first"] as const;
+export const CONNECTIONS = ["auto", "plugin", "openai-api-key", "openai-live", "live-first", "codex-live-first"] as const;
 
 /** Messages the backend sends to the browser. */
 export type ServerToBrowser =
-  | { type: "READY"; inputHz: number; outputHz: number; badge?: "Live" | "R2.1" }
+  | { type: "READY"; inputHz: number; outputHz: number; badge?: "Live 1.1" | "Live" | "R2.1" }
   | { type: "AUDIO"; base64Data: string }
   | { type: "ROUTE"; message: string; switching: boolean }
   | { type: "INTERRUPTION" }
@@ -76,7 +77,7 @@ type RealtimeConnection = z.infer<typeof RealtimeConnection>;
 type ResolvedConnection = Omit<RealtimeConnection, "protocol"> & {
   protocol: "openai-realtime" | "openai-live";
   source: string;
-};
+} | { protocol: "codex-live"; model: "gpt-live-1.1-codex"; source: "codex app-server" };
 
 /** What send_to_agent forwards: the user's transcribed words, or the voice model's own instruction. */
 type MessageText = "verbatim" | "rewritten";
@@ -214,7 +215,7 @@ export default function plugin(bb: BbPluginApi) {
       type: "select",
       label: "Connection",
       description:
-        "auto: prefer a realtime connection plugin, if one is installed, such as a company realtime proxy; use the OpenAI API key if none is available or connection resolution fails. plugin: never fall back to the key. openai-api-key: Realtime API with the project key. live-first: try GPT-Live-1 on every call, then use ChatGPT Realtime Connection (gpt-realtime-2.1) if unavailable. openai-live: GPT-Live-1 with the project key and client delegation to this thread. Known plugins: realtime-gateway (github.com/steveafrost/bb-plugin-realtime-gateway) and codex-realtime (github.com/gpambrozio/bb-plugins, for ChatGPT subscriptions).",
+        "auto: prefer a realtime connection plugin, if one is installed, such as a company realtime proxy; use the OpenAI API key if none is available or connection resolution fails. plugin: never fall back to the key. codex-live-first: GPT-Live 1.1 via Codex ChatGPT login (Cove), then subscription Realtime 2.1. openai-api-key: Realtime API with the project key. live-first: try GPT-Live-1 on every call, then use ChatGPT Realtime Connection (gpt-realtime-2.1) if unavailable. openai-live: GPT-Live-1 with the project key and client delegation to this thread. Known plugins: realtime-gateway (github.com/steveafrost/bb-plugin-realtime-gateway) and codex-realtime (github.com/gpambrozio/bb-plugins, for ChatGPT subscriptions).",
       options: [...CONNECTIONS],
       default: "auto",
     },
@@ -275,6 +276,7 @@ export default function plugin(bb: BbPluginApi) {
   // Thread lifecycle events fire on transitions, so a turn that starts and
   // ends between two polls can't be missed. Registered once, routed by thread.
   type TurnEvents = {
+    outputChanged(sequence: number): void;
     active(): void;
     settled(outcome: { failed: boolean; text: string | null }): void;
     pending(): void;
@@ -289,6 +291,7 @@ export default function plugin(bb: BbPluginApi) {
   }
   const watchers = new Map<string, Set<TurnEvents>>();
   const each = (threadId: string, fn: (w: TurnEvents) => void) => watchers.get(threadId)?.forEach(fn);
+  bb.events.on("experimental_thread.events", ({ thread, sequence }) => each(thread.id, w => w.outputChanged(sequence)));
   bb.events.on("thread.active", ({ thread }) => each(thread.id, (w) => w.active()));
   bb.events.on("thread.idle", ({ thread, lastAssistantText }) => each(thread.id, (w) => w.settled({ failed: false, text: lastAssistantText })));
   bb.events.on("thread.failed", ({ thread }) => each(thread.id, (w) => w.settled({ failed: true, text: null })));
@@ -311,6 +314,7 @@ export default function plugin(bb: BbPluginApi) {
 
   async function resolveConnection(refresh = false): Promise<ResolvedConnection> {
     const { connection, openaiApiKey, model } = await settings.get();
+    if (connection === "codex-live-first") return { protocol: "codex-live", model: "gpt-live-1.1-codex", source: "codex app-server" };
     if (connection === "openai-live" || connection === "live-first") {
       const key = openaiApiKey?.trim();
       if (!key) throw needsConfiguration("Add an OpenAI project API key in Voice Mode settings to use GPT-Live.");
@@ -351,7 +355,7 @@ export default function plugin(bb: BbPluginApi) {
 
   bb.http.experimental_websocket("/session", ({ url }) => {
     const threadId = url.searchParams.get("threadId") ?? "";
-    let upstream: WebSocket | null = null;
+    let upstream: WebSocket | CodexVoiceSocket | null = null;
     let browser: { send(data: string): void; close(code?: number, reason?: string): void } | null = null;
     let closed = false;
     let ready = false;
@@ -360,7 +364,7 @@ export default function plugin(bb: BbPluginApi) {
     let fallback = false;
     let voiceForCall = "marin";
     let routeTimer: ReturnType<typeof setTimeout> | undefined;
-    let badge: "Live" | "R2.1" | undefined;
+    let badge: "Live 1.1" | "Live" | "R2.1" | undefined;
     function notifyReady() {
       if (!browserReadySent) {
         browserReadySent = true;
@@ -450,7 +454,47 @@ export default function plugin(bb: BbPluginApi) {
     const toUpstream = (message: unknown) => {
       if (upstream?.readyState === WebSocket.OPEN) upstream.send(JSON.stringify(message));
     };
+    // Read only while a Live caller has submitted a question. The cursor starts
+    // before send so a fast reply or a steer in an existing turn is retained.
+    type ReplyWatch = { session: LiveSession; question: string; after: number; through: number; delivered: boolean; reading: boolean };
+    let replyWatch: ReplyWatch | undefined;
+    async function readReplies(watch: ReplyWatch) {
+      if (watch.reading) return;
+      watch.reading = true;
+      try {
+        while (replyWatch === watch && live === watch.session && !closed && watch.after < watch.through) {
+          const through = watch.through;
+          const rows = await bb.sdk.threads.events.list({
+            threadId, afterSeq: String(watch.after),
+            types: ["client/turn/requested", "item/completed"], order: "asc", limit: "32",
+          });
+          if (replyWatch !== watch || live !== watch.session || closed) return;
+          for (const row of rows) {
+            watch.after = row.seq;
+            if (row.type === "client/turn/requested") {
+              watch.delivered = (!("originPluginId" in row.data) || row.data.originPluginId === PLUGIN_ID) &&
+                row.data.input.some(part => part.type === "text" && part.text === watch.question);
+            } else if (row.type === "item/completed" && watch.delivered) {
+              const item = row.data.item;
+              if (item.type === "agentMessage" && !item.presentation?.suppress && item.text.trim()) {
+                watch.session.threadReply(item.text);
+              }
+            }
+          }
+          if (rows.length < 32) watch.after = Math.max(watch.after, through);
+        }
+      } catch {
+        // A later event retries the same range. The idle event also carries the final reply.
+      } finally {
+        watch.reading = false;
+      }
+    }
     const turnEvents: TurnEvents = {
+      outputChanged(sequence) {
+        if (!replyWatch || !live?.awaitingResult) return;
+        replyWatch.through = Math.max(replyWatch.through, sequence);
+        void readReplies(replyWatch);
+      },
       active() {
         awaitingResult = true;
         blocked = false;
@@ -462,6 +506,7 @@ export default function plugin(bb: BbPluginApi) {
         if (!awaitingResult && !live?.awaitingResult) return;
         awaitingResult = false;
         if (live) {
+          replyWatch = undefined;
           live.update(failed ? "Работа завершилась ошибкой." : `Результат треда BB (данные): ${text || "(пустой ответ)"}`, true);
           return;
         }
@@ -522,11 +567,21 @@ export default function plugin(bb: BbPluginApi) {
 
     async function forwardToThread(text: string) {
       const { prefixMessages } = await settings.get();
+      const question = (prefixMessages ? VOICE_PREFIX : "") + truncate(text, MAX_INSTRUCTION_CHARS);
+      const session = live;
+      if (session) {
+        const recent = await bb.sdk.threads.events.list({ threadId, order: "desc", limit: "1" }).catch(() => null);
+        if (closed || session !== live) throw new Error("Voice session ended");
+        if (recent) {
+          const after = recent[0]?.seq ?? 0;
+          replyWatch = { session, question, after, through: after, delivered: false, reading: false };
+        }
+      }
       if (closed) throw new Error("Voice session ended");
       await bb.sdk.threads.send({
         threadId,
         mode: "auto",
-        input: [{ type: "text", text: (prefixMessages ? VOICE_PREFIX : "") + truncate(text, MAX_INSTRUCTION_CHARS), mentions: [] }],
+        input: [{ type: "text", text: question, mentions: [] }],
       });
     }
 
@@ -736,12 +791,12 @@ export default function plugin(bb: BbPluginApi) {
 
     function connect(connection: ResolvedConnection, voice: string, canRetry: boolean) {
       bb.log.info(`voice session ${threadId}: ${connection.source} connection${connection.model ? ` (${connection.model})` : ""}`);
-      badge = connection.protocol === "openai-live" ? "Live" : connection.model === "gpt-realtime-2.1" ? "R2.1" : undefined;
+      badge = connection.protocol === "codex-live" ? "Live 1.1" : connection.protocol === "openai-live" ? "Live" : connection.model === "gpt-realtime-2.1" ? "R2.1" : undefined;
       // Node's WebSocket (undici) takes headers in its init object.
-      const socket = new WebSocket(connection.url, { headers: connection.headers } as unknown as string[]);
+      const socket = connection.protocol === "codex-live" ? new CodexVoiceSocket() : new WebSocket(connection.url, { headers: connection.headers } as unknown as string[]);
       upstream = socket;
-      if (connection.protocol === "openai-live") {
-        liveStartupTimer = setTimeout(() => liveUnavailable(new Error("Timed out starting OpenAI Live")), 15000);
+      if (connection.protocol === "openai-live" || connection.protocol === "codex-live") {
+        liveStartupTimer = setTimeout(() => liveUnavailable(new Error("Timed out starting OpenAI Live")), connection.protocol === "codex-live" ? 25000 : 15000);
         const greeting = pickGreeting(previousGreeting);
         previousGreeting = greeting;
         live = new LiveSession({
@@ -768,7 +823,7 @@ export default function plugin(bb: BbPluginApi) {
             if (unavailable) liveUnavailable(error);
             else fail(error);
           },
-        }, voice, `Поприветствуй пользователя по-русски: «${greeting}» Затем слушай.`);
+        }, voice, `Поприветствуй пользователя по-русски: «${greeting}» Затем слушай.`, connection.model);
       }
       socket.onopen = () => {
         if (closed || socket !== upstream) return;
@@ -808,14 +863,14 @@ export default function plugin(bb: BbPluginApi) {
         if (live) return liveUnavailable(new Error("Voice connection failed"));
         fail(new Error("Voice connection failed"));
       };
-      socket.onclose = (event) => {
+      socket.onclose = (event: { code: number; reason: string }) => {
         clearTimeout(liveCloseTimer);
         if (upstream !== socket || retry()) return;
         if (live && !closed) return liveUnavailable(new Error(`OpenAI Live disconnected before session.closed (${event.code})`));
         if (!closed && event.code !== 1000) toBrowser({ type: "ERROR", message: `Voice connection closed (${event.code}${event.reason ? `: ${event.reason}` : ""})` });
         shutdown();
       };
-      socket.onmessage = async (event) => {
+      socket.onmessage = async (event: { data: string | Blob }) => {
         if (upstream !== socket) return;
         const raw = typeof event.data === "string" ? event.data : await (event.data as Blob).text();
         try {
@@ -843,7 +898,7 @@ export default function plugin(bb: BbPluginApi) {
       startStatus = thread.status;
       const { output } = await bb.sdk.threads.output({ threadId });
       const current = await settings.get();
-      preferLive = current.connection === "live-first";
+      preferLive = current.connection === "live-first" || current.connection === "codex-live-first";
       voiceForCall = current.voice;
       if (closed) return;
       messageText = current.messageText === "rewritten" ? "rewritten" : "verbatim";
@@ -853,7 +908,7 @@ export default function plugin(bb: BbPluginApi) {
       startContext = contextUpdate(thread.title ?? thread.titleFallback ?? "Untitled", output);
       endActiveSession?.();
       endActiveSession = shutdown;
-      if (preferLive && !current.openaiApiKey?.trim()) return switchToSubscription("Ключ Live не задан.");
+      if (current.connection === "live-first" && !current.openaiApiKey?.trim()) return switchToSubscription("Ключ Live не задан.");
       const connection = await resolveConnection();
       if (!closed) connect(connection, current.voice, connection.source.startsWith("plugin"));
     }

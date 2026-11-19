@@ -15,7 +15,7 @@ export interface VoiceState {
   caption: string;
   agentStatus: string | null;
   route: string;
-  badge: "" | "Live" | "R2.1" | "R2.1…";
+  badge: "" | "Live 1.1" | "Live" | "R2.1" | "R2.1…";
 }
 
 const OFF: VoiceState = { phase: "off", muted: false, caption: "", agentStatus: null, route: "", badge: "" };
