@@ -18,6 +18,7 @@
 // in the system instructions, responses the backend starts (bb updates, tool
 // follow-ups) cannot call tools, and the user gets one send_to_agent per thing
 // they say.
+import { resumableCalls } from "./resume";
 import { CodexVoiceSocket } from "./codex-voice-socket";
 import { LiveSession, LIVE_URL } from "./live-session";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
@@ -353,7 +354,7 @@ export default function plugin(bb: BbPluginApi) {
     return { protocol: "openai-realtime", url: url.toString(), headers: { authorization: `Bearer ${key}` }, model, source: "api-key" };
   }
 
-  bb.http.experimental_websocket("/session", ({ url }) => {
+  bb.http.experimental_websocket("/session", resumableCalls(({ url }) => {
     const threadId = url.searchParams.get("threadId") ?? "";
     let upstream: WebSocket | CodexVoiceSocket | null = null;
     let browser: { send(data: string): void; close(code?: number, reason?: string): void } | null = null;
@@ -958,5 +959,5 @@ export default function plugin(bb: BbPluginApi) {
         shutdown();
       },
     };
-  });
+  }));
 }

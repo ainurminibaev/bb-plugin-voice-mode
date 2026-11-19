@@ -54,3 +54,7 @@ keeps the BB thread and microphone but starts a fresh voice conversation.
 During a Live call, a posted assistant reply to a spoken question can be read aloud while the BB thread continues working. Tool output and private reasoning are excluded.
 
 For Codex subscription Live 1.1, install the server bridge with `python3 codex_voice.py --install` and select `codex-live-first`. Verify the Live 1.1 badge, voiced thread reply and Realtime fallback.
+
+Brief browser disconnects can resume the same call. The server keeps the call
+for eight seconds and replays missed output within a bounded buffer. After a
+longer outage the caller can start a new call from the same thread.

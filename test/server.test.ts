@@ -63,6 +63,7 @@ async function startSession(options: {
   connectionPlugin?: boolean;
   connectionUrl?: string;
   subscription?: boolean;
+  buffered?: boolean;
   connectionError?: Error;
   refreshError?: Error;
   interactions?: unknown[];
@@ -98,7 +99,7 @@ async function startSession(options: {
     } as never,
   });
   plugin(bb);
-  const browser = await harness.experimental_openWebSocket(`/session?threadId=${THREAD}`);
+  const browser = await harness.experimental_openWebSocket(`/session?threadId=${THREAD}${options.buffered ? "&transport=buffered" : ""}`);
   await flush();
   const toBrowser = () => browser.sent.map((m) => JSON.parse(String(m)) as Record<string, unknown>);
   return { harness, browser, toBrowser, bb };
@@ -859,4 +860,45 @@ it("starts 1.1 through Codex without a key and retains the subscription fallback
   expect(FakeUpstream.last!.url).toMatch(/gpt-realtime-2\.1$/);
   expect(toBrowser().filter(e => e.type === "READY")).toHaveLength(1);
   await browser.close();
+});
+
+describe("short network interruptions", () => {
+  it("replays only missing audio and keeps the same upstream; END closes it", async () => {
+    const { browser, toBrowser, harness } = await startSession({ buffered: true, connectionPlugin: true });
+    const upstream = FakeUpstream.last!;
+    upstream.open();
+    upstream.emit({ type: "session.updated" });
+    upstream.emit({ type: "response.output_audio.delta", delta: "AAAA" });
+    const token = toBrowser()[0].token;
+    const after = toBrowser().at(-1)!.seq;
+    await browser.close(1006);
+    upstream.emit({ type: "response.output_audio.delta", delta: "AQID" });
+    const other = await harness.experimental_openWebSocket("/session?threadId=thr_other&transport=resume");
+    await other.receive(JSON.stringify({ token, after }));
+    expect(other.closeCalls.at(-1)?.code).toBe(1008);
+    const next = await harness.experimental_openWebSocket(`/session?threadId=${THREAD}&transport=resume`);
+    await next.receive(JSON.stringify({ token, after }));
+    expect(next.sent.map(x => JSON.parse(String(x)))).toEqual([
+      { type: "RESUMED" },
+      { seq: Number(after) + 1, event: { type: "AUDIO", base64Data: "AQID" } },
+    ]);
+    expect(upstream.readyState).toBe(1);
+    expect(FakeUpstream.last).toBe(upstream);
+    await next.receive(JSON.stringify({ type: "END" }));
+    expect(upstream.readyState).toBe(3);
+  });
+
+  it("releases an abandoned call when the resume window expires", async () => {
+    const { browser } = await startSession({ buffered: true, connectionPlugin: true });
+    const upstream = FakeUpstream.last!;
+    upstream.open();
+    vi.useFakeTimers();
+    try {
+      await browser.close(1006);
+      vi.advanceTimersByTime(7999);
+      expect(upstream.readyState).toBe(1);
+      vi.advanceTimersByTime(1);
+      expect(upstream.readyState).toBe(3);
+    } finally { vi.useRealTimers(); }
+  });
 });

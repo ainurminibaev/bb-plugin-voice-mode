@@ -258,3 +258,8 @@ Realtime 2.1. The project API key is optional in this mode. The BB thread
 handles spoken tasks. Codex starts an ephemeral voice thread with a read-only
 sandbox, and the bridge interrupts automatic backend turns. Audio travels
 through the BB server. Run the installer again after updating the bridge.
+
+Short browser network interruptions keep the same upstream call open for up to
+eight seconds. The browser reattaches with a per-call token and replays missed
+output in order. A small playback buffer absorbs ordinary packet jitter.
+Ending the call disconnects immediately when the browser is online.

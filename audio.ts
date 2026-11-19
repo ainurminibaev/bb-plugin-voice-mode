@@ -58,7 +58,9 @@ export class Player {
     const source = this.ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(this.analyser);
-    const startAt = Math.max(this.ctx.currentTime + 0.02, this.playhead);
+    // Keep a small reserve across uneven packet arrivals. Refill only after an underrun.
+    const now = this.ctx.currentTime;
+    const startAt = this.playhead > now ? this.playhead : now + 0.14;
     source.start(startAt);
     this.playhead = startAt + buffer.duration;
     this.sources.add(source);

@@ -3,6 +3,7 @@
 // overlay shows a floating pill until you're back. Only one session runs at a
 // time: starting a second ends the first.
 import type { BrowserToServer, ServerToBrowser } from "./server";
+import { CallTransport } from "./call-transport";
 import { Player, startMic } from "./audio";
 
 const PLUGIN_ID = "voice-mode";
@@ -95,18 +96,17 @@ export class VoiceSession {
     if (this.teardown) return;
     for (const other of sessions.values()) if (other !== this) await other.stop();
     this.set({ phase: "connecting", caption: "", route: "", badge: "", agentStatus: null, muted: false });
-    const ws = new WebSocket(sessionUrl(this.threadId));
     let stopMic: (() => Promise<void>) | null = null;
     let ended = false;
     const send = (message: BrowserToServer) => {
-      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message));
+      transport.send(message);
     };
     const cleanup = async (next: Phase = "off") => {
       if (ended) return;
       ended = true;
       this.teardown = null;
       send({ type: "END" });
-      ws.close();
+      transport.close();
       await stopMic?.();
       await this.player?.close();
       this.player = null;
@@ -115,8 +115,7 @@ export class VoiceSession {
     };
     this.teardown = () => cleanup("off");
 
-    ws.onmessage = async (event) => {
-      const message = JSON.parse(String(event.data)) as ServerToBrowser;
+    const onMessage = async (message: ServerToBrowser) => {
       switch (message.type) {
         case "READY": {
           if (message.badge) this.set({ badge: message.badge });
@@ -182,11 +181,10 @@ export class VoiceSession {
           break;
       }
     };
-    ws.onerror = () => {
-      this.set({ caption: "Could not reach the Voice Mode backend" });
+    const transport = new CallTransport(sessionUrl(this.threadId), onMessage, () => {
+      this.set({ caption: "Связь с Voice Mode потеряна" });
       void cleanup("error");
-    };
-    ws.onclose = () => void cleanup("off");
+    });
   }
 }
 
