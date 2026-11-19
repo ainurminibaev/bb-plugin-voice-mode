@@ -24,6 +24,10 @@ function float32FromBase64Pcm16(base64: string): Float32Array<ArrayBuffer> {
 export class Player {
   private readonly ctx: AudioContext;
   private playhead = 0;
+  private speechChunks = 0;
+  private quietChunks = 0;
+  private ducked = false;
+  private readonly gain: GainNode;
   private readonly sources = new Set<AudioBufferSourceNode>();
   onIdle: (() => void) | null = null;
 
@@ -31,7 +35,9 @@ export class Player {
     this.ctx = new AudioContext({ sampleRate });
     this.analyser = this.ctx.createAnalyser();
     this.analyser.fftSize = 512;
-    this.analyser.connect(this.ctx.destination);
+    this.gain = this.ctx.createGain();
+    this.analyser.connect(this.gain);
+    this.gain.connect(this.ctx.destination);
   }
 
   private readonly analyser: AnalyserNode;
@@ -50,6 +56,19 @@ export class Player {
     return this.sources.size > 0;
   }
 
+  micLevel(rms: number, muted: boolean) {
+    // Briefly lower playback under sustained near-end speech. The server
+    // remains responsible for cancelling the response and clearing its queue.
+    const speech = !muted && this.playing && rms > Math.max(0.04, this.level() * 0.5);
+    this.speechChunks = speech ? this.speechChunks + 1 : 0;
+    this.quietChunks = speech ? 0 : this.quietChunks + 1;
+    const duck = !muted && this.playing && (this.ducked ? this.quietChunks < 4 : this.speechChunks >= 2);
+    if (duck !== this.ducked) {
+      this.ducked = duck;
+      this.gain.gain.setTargetAtTime(duck ? 0.1 : 1, this.ctx.currentTime, duck ? 0.01 : 0.03);
+    }
+  }
+
   enqueue(base64: string) {
     const samples = float32FromBase64Pcm16(base64);
     if (samples.length === 0) return;
@@ -60,7 +79,8 @@ export class Player {
     source.connect(this.analyser);
     // Keep a small reserve across uneven packet arrivals. Refill only after an underrun.
     const now = this.ctx.currentTime;
-    const startAt = this.playhead > now ? this.playhead : now + 0.14;
+    const shortUnderrun = this.playhead > 0 && now - this.playhead < 0.35;
+    const startAt = this.playhead > now ? this.playhead : now + (shortUnderrun ? 0.04 : 0.14);
     source.start(startAt);
     this.playhead = startAt + buffer.duration;
     this.sources.add(source);
@@ -81,6 +101,7 @@ export class Player {
     }
     this.sources.clear();
     this.playhead = 0;
+    this.micLevel(0, true);
     this.onIdle?.();
   }
 

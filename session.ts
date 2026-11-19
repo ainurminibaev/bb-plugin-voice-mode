@@ -139,8 +139,7 @@ export class VoiceSession {
             stopMic = await startMic(message.inputHz, () => this.state.muted, (base64Data, rms) => {
               send({ type: "AUDIO", base64Data });
               this.micLevel = rms;
-              // Only server speech detection interrupts playback. Volume alone
-              // mistakes taps, bumps and echo for the user's speech.
+              player.micLevel(rms, this.state.muted);
             });
             // The user may have ended the session while the permission prompt was open.
             if (ended) {

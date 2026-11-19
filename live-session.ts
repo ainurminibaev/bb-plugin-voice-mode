@@ -45,7 +45,7 @@ export class LiveSession {
   private consumedUntil = -1;
   private lastCaption = { user: "", assistant: "" };
   private lastRole: "user" | "assistant" | null = null;
-  private pending = new Map<string, ReturnType<typeof setTimeout>>();
+  private pending = new Map<string, { timer: ReturnType<typeof setTimeout>; offset: number }>();
   private task: string | null = null;
   private lastReply = "";
   private ready = false;
@@ -158,6 +158,17 @@ export class LiveSession {
       this.hooks.browser({ type: "AUDIO", base64Data: event.delta });
       return;
     }
+    if (event.type === "session.delegation.transcribed" && typeof event.delegation_id === "string") {
+      const pending = this.pending.get(event.delegation_id);
+      if (!pending || typeof event.text !== "string" || !event.text.trim()) return;
+      const transcript = this.fragments.filter(f => f.start >= this.consumedUntil && f.end <= pending.offset)
+        .sort((a, b) => a.start - b.start).map(f => f.text).join("").trim();
+      if (transcript === event.text.trim()) {
+        clearTimeout(pending.timer);
+        void this.delegate(event.delegation_id, pending.offset);
+      }
+      return;
+    }
     if (typeof event.event_id !== "string" || this.seen.has(event.event_id)) return;
     if (event.type === "session.delegation.created") {
       const d = event.delegation as { id?: string; target?: string } | undefined;
@@ -166,7 +177,8 @@ export class LiveSession {
       this.seen.add(event.event_id);
       const id = d.id;
       this.delegations.add(id);
-      this.pending.set(id, setTimeout(() => void this.delegate(id, offset), TRANSCRIPT_GRACE_MS));
+      const timer = setTimeout(() => void this.delegate(id, offset), TRANSCRIPT_GRACE_MS);
+      this.pending.set(id, { timer, offset });
       return;
     }
     if (event.type !== "session.input_transcript.delta" && event.type !== "session.output_transcript.delta") return;
@@ -189,7 +201,7 @@ export class LiveSession {
 
   dispose() {
     this.ended = true;
-    for (const timer of this.pending.values()) clearTimeout(timer);
+    for (const { timer } of this.pending.values()) clearTimeout(timer);
     this.pending.clear();
     this.fragments = [];
   }

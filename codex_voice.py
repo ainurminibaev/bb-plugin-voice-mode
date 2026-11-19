@@ -144,8 +144,11 @@ async def run():
     def closed():
         done.set()
 
+    pending_turn = None
+
     @dc.on("message")
     def event(raw):
+        nonlocal pending_turn
         msg = json.loads(raw)
         kind = msg.get("type")
         item = msg.get("item") or {}
@@ -156,8 +159,14 @@ async def run():
             emit("session." + role + "_transcript.delta", event_id=item["id"], delta=item["text"],
                  start_ms=msg["start_ms"], end_ms=msg["end_ms"])
         elif kind == "delegation.created" and item.get("target") == "client":
+            pending_turn = (item.get("user_bidi_turn_id"), item["id"])
             emit("session.delegation.created", event_id=item["id"], offset_ms=msg["offset_ms"],
                  delegation={"id": item["id"], "target": "client"})
+        elif kind == "turn.done" and pending_turn:
+            turn = msg.get("turn") or {}
+            if turn.get("role") == "user" and turn.get("id") and turn["id"] == pending_turn[0]:
+                emit("session.delegation.transcribed", delegation_id=pending_turn[1], text=turn.get("transcript"))
+                pending_turn = None
         elif kind == "error":
             error = msg.get("error") or {}
             emit("error", error={"code": str(error.get("code", "connection_lost"))})

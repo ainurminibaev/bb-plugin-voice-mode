@@ -10,6 +10,7 @@ it("plays through a 100 ms late packet and discards queued sound on interrupt", 
   class Context {
     sampleRate = 24000;
     get currentTime() { return now; }
+    createGain() { return { connect() {}, gain: { setTargetAtTime() {} } }; }
     createAnalyser() { return { connect() {} }; }
     createBuffer(_channels: number, frames: number, rate: number) {
       return { copyToChannel() {}, duration: frames / rate };

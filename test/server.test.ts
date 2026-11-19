@@ -638,6 +638,30 @@ describe("GPT-Live project key mode", () => {
     expect(socket.readyState).toBe(3);
   });
 
+  it("forwards a confirmed matching transcript early and only once", async () => {
+    const { socket, harness, browser } = await openLive();
+    vi.useFakeTimers();
+    try {
+      socket.emit(ready);
+      socket.emit(delegation);
+      socket.emit(words);
+      const confirmed = { type: "session.delegation.transcribed", delegation_id: "d", text: "Проверь сборку" };
+      socket.emit(confirmed);
+      expect(harness.sdk.callsTo("threads.send")).toHaveLength(0);
+      socket.emit({ ...words, event_id: "last", start_ms: 350, end_ms: 780, delta: "сборку" });
+      socket.emit(confirmed);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(harness.sdk.callsTo("threads.send")).toHaveLength(1);
+      socket.emit(confirmed);
+      await vi.advanceTimersByTimeAsync(900);
+      expect(harness.sdk.callsTo("threads.send")).toHaveLength(1);
+    } finally {
+      await browser.close();
+      socket.emit({ type: "session.closed" });
+      vi.useRealTimers();
+    }
+  });
+
   it("correlates late and duplicate transcript fragments, forwards once and reports the result against its delegation", async () => {
     const { socket, harness, browser } = await openLive();
     vi.useFakeTimers();
