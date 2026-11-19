@@ -59,4 +59,4 @@ Brief browser disconnects can resume the same call. The server keeps the call
 for eight seconds and replays missed output within a bounded buffer. After a
 longer outage the caller can start a new call from the same thread.
 
-The voice selector beside the Voice Mode button saves the Codex Live voice. Cove is the default. Selecting Juniper or another voice during a Live 1.1 call starts a fresh call in the same thread with the microphone mute setting preserved.
+Hold the Voice Mode button for half a second with a mouse or finger to open Voice and language. Right-click and Shift+F10 also open it. A short press starts the call. During a call the waveform/status opens the same settings. Apply both choices together to restart once in the same thread with the microphone mute state preserved. Cancel keeps the current call. Russian is the initial language; Auto listens first and follows the caller's language. Codex Live keeps the selected ChatGPT voice (Cove by default).

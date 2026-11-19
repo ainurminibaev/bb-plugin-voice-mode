@@ -902,3 +902,28 @@ describe("short network interruptions", () => {
     } finally { vi.useRealTimers(); }
   });
 });
+
+describe("spoken language", () => {
+  it.each(["en", "auto"])("applies %s to Codex Live and its Realtime fallback", async language => {
+    const { browser } = await startSession({ subscription: true, settings: {
+      connection: "codex-live-first", codexLiveVoice: "juniper", speechLanguage: language,
+    } });
+    const live = FakeUpstream.last!;
+    live.open();
+    const [start] = live.ofType("session.start") as {session: {instructions: string; input: unknown[]}}[];
+    expect(start.session.instructions).toContain(language === "en" ? "Speak English" : "language the caller is speaking");
+    expect(start.session.input.length).toBe(language === "en" ? 1 : 0);
+    live.emit({type: "session.started"});
+    await browser.receive(JSON.stringify({type: "CLIENT_READY"}));
+    expect(live.ofType("session.commentary.append").length).toBe(language === "en" ? 1 : 0);
+    live.onclose?.({code: 1006, reason: "connection lost"});
+    await flush();
+    const fallback = FakeUpstream.last!;
+    expect(fallback).not.toBe(live);
+    fallback.open();
+    const [update] = fallback.ofType("session.update") as {session: {audio: {input: {transcription: {language?: string}}}; instructions: string}}[];
+    expect(update.session.audio.input.transcription.language).toBe(language === "en" ? "en" : undefined);
+    expect(update.session.instructions).toContain(language === "en" ? "Speak English" : "language the caller is speaking");
+    await browser.receive(JSON.stringify({type:"END"}));
+  });
+});

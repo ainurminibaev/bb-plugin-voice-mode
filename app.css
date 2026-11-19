@@ -63,3 +63,13 @@
 .voice-mode-back-row:focus-visible > span:first-child {
   color: var(--foreground);
 }
+
+[data-voice-options-trigger] { touch-action: manipulation; -webkit-touch-callout: none; user-select: none; }
+dialog.voice-options { position: fixed; inset: 0; margin: auto; width: min(20rem, calc(100vw - 2rem)); padding: 1rem; border: 1px solid var(--border); border-radius: 12px; background: var(--background); color: var(--foreground); }
+.voice-options::backdrop { background: rgb(0 0 0 / .32); }
+.voice-options form, .voice-options label { display: grid; gap: .4rem; }
+.voice-options form { gap: .9rem; }
+.voice-options h2 { font-size: 1rem; font-weight: 600; }
+.voice-options select, .voice-options footer button { min-height: 2.5rem; border: 1px solid var(--border); border-radius: 6px; padding: .3rem .6rem; background: var(--background); color: var(--foreground); }
+.voice-options footer { display: flex; justify-content: flex-end; gap: .5rem; }
+.voice-options button[type=submit] { background: var(--foreground); color: var(--background); }
