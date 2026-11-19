@@ -114,7 +114,7 @@ function OptionsDialog({ session, dismiss }: { session?: VoiceSession; dismiss()
       const r = dialog.current.getBoundingClientRect();
       if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) dismiss();
     } }}>
-    <form onSubmit={e => { e.preventDefault(); void save(); }}>
+    <form onSubmit={e => { e.preventDefault(); e.stopPropagation(); void save(); }}>
       <h2>Голос и язык</h2>
       <label>Голос<select disabled={!values || saving} value={voice ?? currentVoice} onChange={e => setVoice(e.target.value)}>
         {(codex ? LIVE_VOICES : REALTIME_VOICES).map(v => <option key={v} value={v}>{v[0].toUpperCase() + v.slice(1)}</option>)}
