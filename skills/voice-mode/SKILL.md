@@ -37,3 +37,16 @@ progress checks use the status tool and report only a confirmed stage. Never
 invent progress. Wait for the thread result before giving its substantive answer.
 This fork does not persist standalone voice conversations as thread messages.
 Noise threshold, pause duration and noise reduction apply at the next session.
+
+## GPT-Live
+
+Select Connection → `openai-live` with a project API key in the secret Voice
+Mode setting. Project API usage starts when you open a call. The server streams
+audio to the Live API and sends a delegated transcript to the selected BB
+thread. Wait for the thread result before speaking about the outcome. Questions and follow-ups go to the current thread automatically, including during work. Use the BB controls for stopping thread work.
+For a key-free protocol check, run `npm test` in the plugin checkout.
+
+Use Connection → live-first to try the project-key Live session afresh on each
+call and automatically reconnect on the configured codex-realtime 2.1 route
+if Live is unavailable. The indicator reports the fallback. A model switch
+keeps the BB thread and microphone but starts a fresh voice conversation.
