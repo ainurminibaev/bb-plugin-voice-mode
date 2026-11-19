@@ -30,7 +30,8 @@ agent is done, and stops talking the moment you talk over it.
 
 Pick one in **Settings → Plugins → Voice Mode** (or `bb plugin config voice-mode`):
 
-- **OpenAI API key** — set `openaiApiKey`. Choose `model` (`gpt-realtime-2`
+- **GPT-Live-1** — select `openai-live` and enter your OpenAI project API key in the secret field. The server connects directly to OpenAI Live using this key.
+- **Realtime with an OpenAI API key** — set `openaiApiKey`. Choose `model` (`gpt-realtime-2`
   by default) and `voice`. The key is only ever sent to
   `wss://api.openai.com/v1/realtime`, and audio goes straight to OpenAI,
   around any company proxy. For another endpoint, use a connection plugin.
@@ -56,6 +57,46 @@ Pick one in **Settings → Plugins → Voice Mode** (or `bb plugin config voice-
   when sessions must stay on your company's connection.
 - `openai-api-key` uses only the configured OpenAI API key and ignores
   connection plugins.
+
+### Trying GPT-Live-1
+
+Select `openai-live`, choose a voice (the default is Marin), and start a call
+from a thread. A call uses the project's API billing. For a first test,
+say “Проверь название текущего проекта”. Check that the thread receives the
+spoken request once and that you hear its result. End the call with the hangup
+button. To use your previous connection, select its previous Connection value.
+
+Live streams 24 kHz PCM and uses client delegation. It forwards the
+caller’s questions, follow-ups and requests verbatim to the current BB thread.
+Follow-ups can steer work in progress. Greetings and microphone checks stay in voice. Use BB to stop work.
+The Realtime model selector, rewritten text and Realtime VAD settings apply to
+the Realtime connection modes. Session limits and the spoken-message prefix
+also apply to Live. The API protocol tests run with `npm test` and a mock socket.
+
+[OpenAI Live WebSocket](https://developers.openai.com/api/reference/resources/live/primary-websocket) · [Client delegation](https://developers.openai.com/api/docs/guides/live-delegation)
+
+### GPT-Live with subscription fallback
+
+For automatic selection choose **Connection → live-first**. Every call first
+opens its own GPT-Live session when a project key is configured. Missing keys,
+unavailable sessions, exhausted credits and interrupted Live connections switch
+the same call to the installed ChatGPT Realtime Connection configured for
+`gpt-realtime-2.1`. The call indicator reports the switch. The microphone
+remains open during an in-call switch. Words spoken while reconnecting may
+need repeating. Explicit hangup and content terminations end the call. A
+failed subscription connection shows an error. This mode never substitutes a
+metered Realtime project-key connection.
+
+
+Eligible ChatGPT Pro subscribers can claim API credits in ChatGPT billing,
+verify the linked organization in API Platform billing, and create a project
+key with Live write access in that organization. Save it in Voice Mode’s
+secret API key field. The call badge shows **Live** or **R2.1**. The credit
+benefit has an expiry date. An organization with paid billing can incur charges
+once promotional credits are spent. Automatic switching occurs when Live
+rejects or loses the session.
+
+[OpenAI credit benefit and billing](https://help.openai.com/en/articles/20001626-api-credits-benefit-for-eligible-chatgpt-subscriptions) · [GPT-Live pricing](https://developers.openai.com/api/docs/models/gpt-live-1)
 
 ### Connection plugins
 
