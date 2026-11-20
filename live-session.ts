@@ -143,7 +143,7 @@ export class LiveSession {
     }
     if (!this.ready) return;
     if (event.type === "session.output_audio.delta" && typeof event.delta === "string") {
-      this.hooks.browser({ type: "AUDIO", base64Data: event.delta });
+      this.hooks.browser({ type: "AUDIO", base64Data: event.delta, ...(typeof event.pts === "number" ? { pts: event.pts } : {}) });
       return;
     }
     if (typeof event.event_id !== "string" || this.seen.has(event.event_id)) return;

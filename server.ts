@@ -51,7 +51,7 @@ export const CONNECTIONS = ["auto", "plugin", "openai-api-key", "openai-live", "
 /** Messages the backend sends to the browser. */
 export type ServerToBrowser =
   | { type: "READY"; inputHz: number; outputHz: number; badge?: "Live 1.1" | "Live" | "R2.1" }
-  | { type: "AUDIO"; base64Data: string }
+  | { type: "AUDIO"; base64Data: string; pts?: number }
   | { type: "ROUTE"; message: string; switching: boolean }
   | { type: "INTERRUPTION" }
   | { type: "TRANSCRIPT"; role: "user" | "assistant"; text: string }

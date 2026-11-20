@@ -28,9 +28,16 @@ agent is done, and stops talking the moment you talk over it.
 
 ## Setup
 
-Pick one in **Settings → Plugins → Voice Mode** (or `bb plugin config voice-mode`):
+Choose a voice route in **Settings → Plugins → Voice Mode**.
 
-- **GPT-Live-1** — select `openai-live` and enter your OpenAI project API key in the secret field. The server connects directly to OpenAI Live using this key.
+| First model | Connection | Credentials and fallback |
+| --- | --- | --- |
+| Codex Live 1.1 | `codex-live-first` | Codex CLI signed in to ChatGPT on the BB server. Falls back directly to the configured subscription Realtime 2.1 connection. No project API key required. |
+| GPT-Live-1 | `openai-live` or `live-first` | Project API key. Choose `openai-live` for Live only, or `live-first` to fall back to subscription Realtime 2.1. |
+| Realtime 2.1 directly | `plugin` | Configure ChatGPT Realtime Connection (`codex-realtime`) for `gpt-realtime-2.1` and ensure discovery selects it. |
+
+Each call starts with the selected route. The two Live modes with fallback go directly to Realtime 2.1 when their primary route is unavailable. The generic `auto` and direct Realtime API-key modes are described below.
+
 - **Realtime with an OpenAI API key** — set `openaiApiKey`. Choose `model` (`gpt-realtime-2`
   by default) and `voice`. The key is only ever sent to
   `wss://api.openai.com/v1/realtime`, and audio goes straight to OpenAI,
@@ -88,13 +95,7 @@ failed subscription connection shows an error. This mode never substitutes a
 metered Realtime project-key connection.
 
 
-Eligible ChatGPT Pro subscribers can claim API credits in ChatGPT billing,
-verify the linked organization in API Platform billing, and create a project
-key with Live write access in that organization. Save it in Voice Mode’s
-secret API key field. The call badge shows **Live** or **R2.1**. The credit
-benefit has an expiry date. An organization with paid billing can incur charges
-once promotional credits are spent. Automatic switching occurs when Live
-rejects or loses the session.
+Eligible paid ChatGPT Pro and Business customers can claim promotional API credits in Billing. Select the API organization, confirm its grant and expiry in API Platform billing, and use a project key from that organization for GPT-Live-1. Promotional credits are spent first. API usage can continue against purchased credits after the grant runs out. Fallback reacts to a failed or unavailable session. The Codex Live 1.1 route uses the signed-in Codex allowance separately.
 
 [OpenAI credit benefit and billing](https://help.openai.com/en/articles/20001626-api-credits-benefit-for-eligible-chatgpt-subscriptions) · [GPT-Live pricing](https://developers.openai.com/api/docs/models/gpt-live-1)
 
@@ -130,10 +131,7 @@ other, or set `connection` explicitly.
 
 ### Subscriptions and ChatGPT sign-in
 
-Voice Mode has no subscription sign-in of its own. It talks to the OpenAI
-Realtime API with an OpenAI API key, or with whatever credential a connection
-plugin returns — so the subscription case is the `codex-realtime` plugin
-above.
+For Codex Live 1.1, the local Codex CLI manages ChatGPT sign-in. For subscription Realtime 2.1, the ChatGPT Realtime Connection plugin supplies the connection.
 
 It is a community plugin, not maintained here. Sending that token to the
 Realtime API is undocumented by OpenAI, and OpenAI already refuses it for at
@@ -149,8 +147,7 @@ failing plugin's reason appear on screen instead of falling back to the key.
 Without a usable plugin connection or API key, the session fails with setup
 instructions. A plugin WebSocket handshake failure gets one connection
 refresh attempt; the same selection rules apply if that refresh fails to
-resolve a connection. Socket failures do not otherwise automatically switch
-providers.
+resolve a connection. The Live-first modes have the explicit fallback described above.
 
 Keys stay on the bb server host; the browser only talks to the plugin's own
 WebSocket route.
