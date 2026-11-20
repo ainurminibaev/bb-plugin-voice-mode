@@ -170,22 +170,29 @@ export default function plugin(bb: BbPluginApi) {
   const settings = bb.settings.define({
     connection: {
       type: "select",
-      label: "Connection",
-      description:
-        "auto: prefer a realtime connection plugin, if one is installed, such as a company realtime proxy; use the OpenAI API key if none is available or connection resolution fails. plugin: never fall back to the key. codex-live-first: GPT-Live 1.1 via Codex ChatGPT login (Cove), then subscription Realtime 2.1. openai-api-key: Realtime API with the project key. live-first: try GPT-Live-1 on every call, then use ChatGPT Realtime Connection (gpt-realtime-2.1) if unavailable. openai-live: GPT-Live-1 with the project key and client delegation to this thread. Known plugins: realtime-gateway (github.com/steveafrost/bb-plugin-realtime-gateway) and codex-realtime (github.com/gpambrozio/bb-plugins, for ChatGPT subscriptions).",
+      label: "Voice connection for new calls",
+      description: "Choose the starting model and sign-in method. The arrow shows the configured fallback.",
+      experimental_optionLabels: {
+        "codex-live-first": "Live 1.1 (Codex · ChatGPT login) → Realtime 2.1",
+        "live-first": "Live 1 (project API key) → Realtime 2.1",
+        "openai-live": "Live 1 only (project API key)",
+        "plugin": "Connection plugin only (model set by provider)",
+        "openai-api-key": "Direct Realtime API (project API key)",
+        "auto": "Automatic (connection plugin → direct Realtime API)",
+      },
       options: [...CONNECTIONS],
       default: "auto",
     },
     openaiApiKey: {
       type: "string",
       label: "OpenAI API key",
-      description: "Used in openai-live and openai-api-key modes, or as the auto fallback when no plugin connection is available or resolution fails; audio goes straight to OpenAI. Stored on the bb server host only.",
+      description: "Used by Live 1, direct Realtime API and the automatic API fallback. Codex Live 1.1 uses the BB server’s ChatGPT login.",
       secret: true,
     },
     model: {
       type: "select",
-      label: "Realtime model (API key)",
-      description: "A connection plugin picks its own model.",
+      label: "Direct Realtime API only — model",
+      description: "Used when the connection is Direct Realtime API or Automatic falls back to the project key. Live 1.1, Live 1 and subscription Realtime 2.1 each use their own model.",
       options: [...MODELS],
       default: MODELS[0],
     },
