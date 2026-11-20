@@ -1,0 +1,34 @@
+# Changelog
+
+## 0.3.1
+
+- Copy a custom legacy realtime model setting to the picker on first start. Keep any saved picker selection.
+
+## 0.3.0
+
+- Add GPT-Live (`gpt-live-*`, protocol `openai-live`) support. Voice Mode connects to `wss://api.openai.com/v1/live/sessions` with an OpenAI API key, or to the URL that a `realtimeConnection` plugin returns.
+- Delegate GPT-Live tool calls to an OpenAI Responses model. Pick it in the new **Delegation backend model** setting, or leave it on Auto to use the fastest live OpenAI model (`luna`, `nano`, `mini`, then `fast`). No model ID is hardcoded.
+- Drop the silent PCM16 frames that GPT-Live streams while idle, so the pill returns to listening and idle timeouts count only real speech.
+- Send agent turn results to GPT-Live as `session.commentary.append`, truncated to 900 characters. Agent output never enters the instructions and never triggers tools.
+- Close GPT-Live sessions with `session.close` and fall back to closing the socket after 1.5 seconds.
+- Add `api` to `VoiceModelOption`, `delegationModel` to `VoiceModelSelection`, and the `delegation` scope to `models.list`. Stored selections without `delegationModel` still load.
+- Keep the `openai-realtime` protocol unchanged.
+
+## 0.2.2
+
+- Accept `groupLabel` and `latestModelsOnly` from `shopify-ai` `models.list` and propagate them through `voiceModeRpcContract["models.list"]` to settings.
+- Group model pickers into `<optgroup>` sections by `groupLabel` (falling back to normalized vendor labels) in server order when multiple groups exist.
+- Show a muted filter note instead of a destructive error when `latestModelsOnly` hides a retained model.
+- Keep `settings.tsx` free of runtime imports from modules that import `@get-bb/plugin-sdk`.
+
+## 0.2.1
+
+- Restore the defaults `gpt-realtime-2` for API key connections, `gpt-4o-mini-transcribe` for input transcription, and the `marin` voice.
+- Keep the selected model in each dropdown when the live catalog is empty, unlisted, or offline. The lists still come from live `realtime` and `audio_transcription` catalogs.
+- A connection plugin keeps its own model until you pick one in the settings.
+
+## 0.2.0
+
+- Replace hardcoded realtime and transcription model lists with live dropdowns populated from the Shopify AI plugin or OpenAI.
+- Scope the sidebar DOM observer once mounted and replace deprecated Zod URL and Web Audio APIs.
+- Target `@get-bb/plugin-sdk@0.6.132`, `zod@4.6.7`. The source repository continues to use `tsc` for typechecking.

@@ -24,6 +24,7 @@ import {
 import { isLive, sessionFor, stopAllSessions, subscribeAll, undockedSession, type Phase, type VoiceSession } from "./session";
 import { compactThreadComposers, planCompactHosts, type CompactComposer } from "./compact-hosts";
 import { ConnectionPluginsSection } from "./connection-plugins";
+import { VoiceModeModelSettings } from "./settings";
 import "./app.css";
 
 const LABELS: Record<Phase, string> = {
@@ -700,12 +701,35 @@ function useSidebarSlot(enabled: boolean): HTMLElement | null {
     if (!enabled) return;
     let frame = 0;
     let current: HTMLElement | null = null;
+    let tracked: HTMLElement | null | undefined;
+    const search = new MutationObserver(() => schedule());
+    const scoped = new MutationObserver(() => schedule());
+    const resize = new ResizeObserver(() => schedule());
+    const track = (body: HTMLElement | null) => {
+      if (body === tracked) return;
+      tracked = body;
+      search.disconnect();
+      scoped.disconnect();
+      resize.disconnect();
+      if (body) {
+        scoped.observe(body, { childList: true, attributes: true, attributeFilter: ["data-state", "style", "hidden"] });
+        resize.observe(body);
+      } else {
+        search.observe(document.body, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ["data-state", "data-collapsible", "style", "hidden"],
+        });
+      }
+    };
     const place = () => {
       frame = 0;
       const body =
         Array.from(document.querySelectorAll<HTMLElement>('[data-testid="app-sidebar-body"]')).find(
           (el) => !el.hidden && el.getBoundingClientRect().width > 80,
         ) ?? null;
+      track(body);
       // React may append its own children after ours; keep ours last.
       if (current && body && current.parentElement === body && body.lastElementChild === current) return;
       if (current && body && current.parentElement === body) {
@@ -725,17 +749,12 @@ function useSidebarSlot(enabled: boolean): HTMLElement | null {
       if (!frame) frame = requestAnimationFrame(place);
     };
     place();
-    // Sidebar collapse, mobile drawer, remounts: re-place on DOM and size changes.
-    const observer = new MutationObserver(schedule);
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["data-state", "data-collapsible", "style", "hidden"],
-    });
+    // Watch the whole document only while the sidebar is missing.
     window.addEventListener("resize", schedule);
     return () => {
-      observer.disconnect();
+      search.disconnect();
+      scoped.disconnect();
+      resize.disconnect();
       window.removeEventListener("resize", schedule);
       cancelAnimationFrame(frame);
       current?.remove();
@@ -892,6 +911,13 @@ export default definePluginApp((app) => {
     title: "Connection plugins",
     description: "Voice Mode installs with none of these. Install one and leave Connection on auto.",
     component: ConnectionPluginsSection,
+  });
+
+  app.slots.settingsSection({
+    id: "voice-models",
+    title: "Voice models",
+    description: "Choose realtime voice, input transcription, and Live delegation models.",
+    component: VoiceModeModelSettings,
   });
 
   app.contentScripts.register({

@@ -6,6 +6,7 @@ import type { BrowserToServer, ServerToBrowser } from "./server";
 import { BARGE_IN_CHUNKS, BARGE_IN_RMS, Player, startMic } from "./audio";
 
 const PLUGIN_ID = "voice-mode";
+const BARGE_IN_QUIET_CHUNKS = 2;
 
 export type Phase = "off" | "connecting" | "listening" | "speaking" | "error";
 
@@ -96,12 +97,16 @@ export class VoiceSession {
     const ws = new WebSocket(sessionUrl(this.threadId));
     let stopMic: (() => Promise<void>) | null = null;
     let ended = false;
+    let bargeInActive = false;
+    let quietChunks = 0;
     const send = (message: BrowserToServer) => {
       if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message));
     };
     const cleanup = async (next: Phase = "off") => {
       if (ended) return;
       ended = true;
+      bargeInActive = false;
+      quietChunks = 0;
       this.teardown = null;
       send({ type: "END" });
       ws.close();
@@ -127,12 +132,23 @@ export class VoiceSession {
             stopMic = await startMic(message.inputHz, () => this.state.muted, (base64Data, rms) => {
               send({ type: "AUDIO", base64Data });
               this.micLevel = rms;
-              loudChunks = rms > BARGE_IN_RMS ? loudChunks + 1 : 0;
+                if (rms > BARGE_IN_RMS) {
+                  loudChunks += 1;
+                  quietChunks = 0;
               if (loudChunks >= BARGE_IN_CHUNKS && player.playing) {
                 player.interrupt();
+                    bargeInActive = true;
                 this.set({ phase: "listening" });
               }
-            });
+                } else {
+                  loudChunks = 0;
+                  if (bargeInActive) {
+                    quietChunks += 1;
+                    if (quietChunks >= BARGE_IN_QUIET_CHUNKS) bargeInActive = false;
+                  }
+                }
+              },
+            );
             // The user may have ended the session while the permission prompt was open.
             if (ended) {
               await stopMic();
@@ -146,14 +162,21 @@ export class VoiceSession {
           break;
         }
         case "AUDIO":
+          if (bargeInActive) break;
           this.player?.enqueue(message.base64Data);
           if (this.state.phase !== "speaking") this.set({ phase: "speaking" });
           break;
         case "INTERRUPTION":
+          bargeInActive = false;
+          quietChunks = 0;
           this.player?.interrupt();
           this.set({ phase: "listening" });
           break;
         case "TRANSCRIPT":
+          if (message.role === "assistant") {
+            bargeInActive = false;
+            quietChunks = 0;
+          }
           this.set({ caption: `${message.role === "user" ? "You" : "Voice"}: ${message.text}` });
           break;
         case "TOOL":
