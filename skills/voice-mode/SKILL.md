@@ -23,6 +23,8 @@ short plain-language summary; avoid leading with long code blocks or tables.
 The session starts from the waveform that replaces the send button when the
 composer is empty and the agent is idle, or from the "Start or end voice
 chat" command (default Ctrl+Shift+V, rebindable in Settings → Keyboard). Settings: `bb plugin config voice-mode` (connection, openaiApiKey,
-model, voice, widgetStyle, messageText, prefixMessages). With `connection` on `auto`, a plugin that publishes a
+model, voice, widgetStyle, messageText, prefixMessages). Model selection, including the GPT-Live
+delegation model, lives in the plugin's settings section. With `connection` on `auto`, a plugin that publishes a
 discoverable `realtimeConnection` rpc supplies the session; otherwise the
-OpenAI API key is used.
+OpenAI API key is used. The voice model can be `gpt-realtime-*` or GPT-Live
+(`gpt-live-*`). Either way, only the user's own words trigger a send.

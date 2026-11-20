@@ -1,6 +1,3 @@
-// Audio plumbing for Voice Mode: PCM16 <-> base64, gapless playback with
-// instant interrupt, and mic capture at the session's input rate.
-
 function base64FromInt16(samples: Int16Array): string {
   const bytes = new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength);
   let binary = "";
@@ -96,6 +93,60 @@ export class Player {
 export const BARGE_IN_RMS = 0.04;
 export const BARGE_IN_CHUNKS = 5;
 
+const CAPTURE_FRAMES = 1024;
+
+const CAPTURE_WORKLET = `
+class MicCapture extends AudioWorkletProcessor {
+  buffer = new Float32Array(${CAPTURE_FRAMES});
+  filled = 0;
+  process(inputs) {
+    const channel = inputs[0]?.[0];
+    if (!channel) return true;
+    for (let i = 0; i < channel.length; i++) {
+      this.buffer[this.filled++] = channel[i];
+      if (this.filled === this.buffer.length) {
+        this.port.postMessage(this.buffer);
+        this.buffer = new Float32Array(${CAPTURE_FRAMES});
+        this.filled = 0;
+      }
+    }
+    return true;
+  }
+}
+registerProcessor("mic-capture", MicCapture);
+`;
+
+async function createCaptureNode(
+  ctx: AudioContext,
+  onFrame: (input: Float32Array) => void,
+): Promise<AudioNode & { stop(): void }> {
+  const url = URL.createObjectURL(new Blob([CAPTURE_WORKLET], { type: "text/javascript" }));
+  try {
+    await ctx.audioWorklet.addModule(url);
+    const node = new AudioWorkletNode(ctx, "mic-capture", { numberOfInputs: 1, numberOfOutputs: 1, channelCount: 1 });
+    node.port.onmessage = (event: MessageEvent<Float32Array>) => onFrame(event.data);
+    return Object.assign(node, {
+      stop() {
+        node.port.onmessage = null;
+        node.port.close();
+      },
+    });
+  } catch {
+    // bb's CSP can refuse a worklet module; fall back to the main-thread processor.
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+  /* oxlint-disable typescript/no-deprecated */
+  const processor = ctx.createScriptProcessor(CAPTURE_FRAMES, 1, 1);
+  processor.onaudioprocess = (event) => onFrame(event.inputBuffer.getChannelData(0));
+  return Object.assign(processor, {
+    stop() {
+      processor.onaudioprocess = null;
+    },
+  });
+  /* oxlint-enable typescript/no-deprecated */
+}
+
 /** Captures the mic at the session's input rate as PCM16 chunks. */
 // While muted the mic keeps running but sends digital silence, so the session
 // stays open and the server VAD still sees the end of any cut-off utterance.
@@ -105,11 +156,7 @@ export async function startMic(sampleRate: number, isMuted: () => boolean, onChu
   });
   const ctx = new AudioContext({ sampleRate });
   const source = ctx.createMediaStreamSource(stream);
-  // ScriptProcessor avoids loading a worklet module under bb's CSP; 1024
-  // frames at 24 kHz is a ~43 ms chunk.
-  const processor = ctx.createScriptProcessor(1024, 1, 1);
-  processor.onaudioprocess = (event) => {
-    const input = event.inputBuffer.getChannelData(0);
+  const processor = await createCaptureNode(ctx, (input) => {
     const pcm = new Int16Array(input.length);
     if (isMuted()) {
       onChunk(base64FromInt16(pcm), 0);
@@ -122,14 +169,14 @@ export async function startMic(sampleRate: number, isMuted: () => boolean, onChu
       pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
     }
     onChunk(base64FromInt16(pcm), Math.sqrt(energy / input.length));
-  };
+  });
   const sink = ctx.createGain();
   sink.gain.value = 0;
   source.connect(processor);
   processor.connect(sink);
   sink.connect(ctx.destination);
   return async () => {
-    processor.onaudioprocess = null;
+    processor.stop();
     stream.getTracks().forEach((track) => track.stop());
     await ctx.close().catch(() => undefined);
   };

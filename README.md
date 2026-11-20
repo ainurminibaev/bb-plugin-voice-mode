@@ -19,8 +19,9 @@ agent is done, and stops talking the moment you talk over it.
   bb's send button for the waveform while the composer is empty and the agent
   is idle, and shows a
   pill (live waveform, status, mute, end) in place of bb's mic while a session
-  runs. Mic capture is 24 kHz PCM with echo cancellation; playback can be cut
-  instantly on barge-in.
+  runs. Mic capture is 24 kHz PCM with echo cancellation. It uses an AudioWorklet,
+  or falls back to ScriptProcessor if the worklet cannot load. Playback stops
+  immediately on barge-in.
 - `skills/voice-mode/SKILL.md` — tells the thread's agent how voice messages
   arrive (the user's own transcribed words, optionally marked `[Voice Mode]`)
   and that its final message is read back.
@@ -30,15 +31,15 @@ agent is done, and stops talking the moment you talk over it.
 
 Pick one in **Settings → Plugins → Voice Mode** (or `bb plugin config voice-mode`):
 
-- **OpenAI API key** — set `openaiApiKey`. Choose `model` (`gpt-realtime-2`
-  by default) and `voice`. The key is only ever sent to
-  `wss://api.openai.com/v1/realtime`, and audio goes straight to OpenAI,
+- **OpenAI API key** — set `openaiApiKey`. Choose **Realtime voice model** (`gpt-realtime-2`
+  by default) and `voice`. The session connects to `wss://api.openai.com/v1/realtime`
+  or, for a `gpt-live-*` model, `wss://api.openai.com/v1/live/sessions`. Audio goes straight to OpenAI,
   around any company proxy. For another endpoint, use a connection plugin.
 - **A connection plugin** — any installed plugin that publishes a discoverable
   `realtimeConnection` rpc returning
-  `{ protocol: "openai-realtime", url, headers, model? }` (`url` must be
-  `wss://`). That plugin picks the model; Voice Mode's `model` setting
-  doesn't apply. This lets a company proxy own credentials and the model
+  `{ protocol, url, headers, model? }`. The protocol is `openai-realtime` or
+  `openai-live`, the URL must be `wss://`, and `openai-live` requires a model.
+  The plugin picks the model unless you explicitly choose one in Voice Mode. This lets a company proxy own credentials and the model
   choice. See [Connection plugins](#connection-plugins) for the two that are
   known to work.
 
@@ -113,6 +114,22 @@ providers.
 
 Keys stay on the bb server host; the browser only talks to the plugin's own
 WebSocket route.
+
+## GPT-Live
+
+Pick a `gpt-live-*` model in **Realtime voice model**, or let a connection
+plugin return `protocol: "openai-live"`. The Live model talks to you and
+transcribes your speech natively, so **Input transcription model** does not
+apply. It delegates tool calls (`send_to_agent`, `stop_agent`,
+`get_agent_status`) to an OpenAI Responses model. **Delegation backend model**
+picks that model. On Auto, Voice Mode takes the first current model from the
+live catalog that matches `luna`, `nano`, `mini`, or `fast`, in that order.
+If the catalog lists no model, the session fails with a setup message.
+
+The agent's turn results reach the Live model as commentary, at most 900
+characters each. Commentary is data. It never enters the instructions and
+never triggers a tool. GPT-Live streams silent audio while idle, so Voice Mode
+drops silent frames after a 400 ms hangover. Silent frames do not reset the idle timeout.
 
 ## Use
 

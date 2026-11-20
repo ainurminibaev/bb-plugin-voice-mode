@@ -1,6 +1,6 @@
 {
   "name": "bb-plugin-voice-mode",
-  "version": "0.1.15",
+  "version": "0.3.1",
   "type": "module",
   "private": true,
   "description": "Talk to a bb thread hands-free: full-duplex, interruptible realtime voice that hands work to the thread's agent.",
@@ -10,8 +10,8 @@
   },
   "license": "MIT",
   "engines": {
-    "bb": ">=0.46",
-    "bbPluginSdk": ">=0.6.49"
+    "bb": ">=0.49",
+    "bbPluginSdk": ">=0.6.132"
   },
   "bb": {
     "name": "Voice Mode",
@@ -26,10 +26,10 @@
     ]
   },
   "dependencies": {
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@get-bb/plugin-sdk": "0.6.49",
+    "@get-bb/plugin-sdk": "0.6.132",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
@@ -38,7 +38,9 @@
     "cron-parser": "^5.10.2",
     "hono": "^4.13.13",
     "typescript": "^5.7.0",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
   },
   "keywords": [
     "bb-plugin"
