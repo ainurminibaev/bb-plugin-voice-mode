@@ -62,3 +62,5 @@ for eight seconds and replays missed output within a bounded buffer. After a
 longer outage the caller can start a new call from the same thread.
 
 Hold the Voice Mode button for half a second with a mouse or finger to open Voice and language. Right-click and Shift+F10 also open it. A short press starts the call. During a call the waveform/status opens the same settings. Apply both choices together to restart once in the same thread with the microphone mute state preserved. Cancel keeps the current call. Russian is the initial language; Auto listens first and follows the caller's language. Codex Live keeps the selected ChatGPT voice (Cove by default).
+
+For direct subscription Realtime 2.1 use `plugin` with the configured `codex-realtime` provider. Eligible Pro and Business API credit grants can fund the GPT-Live-1 project-key route. Check the linked organization and grant in API Platform billing.
