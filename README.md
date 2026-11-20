@@ -1,3 +1,5 @@
+**English** · [Русский](README.ru.md)
+
 # Voice Mode — personal assistant edition
 
 This fork of [Steve Frost’s Voice Mode](https://github.com/steveafrost/bb-plugin-voice-mode)
