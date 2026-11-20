@@ -48,8 +48,9 @@ agent is done, and stops talking the moment you talk over it.
   bb's send button for the waveform while the composer is empty and the agent
   is idle, and shows a
   pill (live waveform, status, mute, end) in place of bb's mic while a session
-  runs. Mic capture is 24 kHz PCM with echo cancellation; playback can be cut
-  instantly on barge-in.
+  runs. Mic capture is 24 kHz PCM with echo cancellation; playback runs
+  through an adaptive jitter buffer (`jitter.ts`) on the audio thread and is
+  cut within a few milliseconds when the server reports the caller speaking.
 - `skills/voice-mode/SKILL.md` — tells the thread's agent how voice messages
   arrive (the user's own transcribed words, optionally marked `[Voice Mode]`)
   and that its final message is read back.
@@ -261,7 +262,21 @@ through the BB server. Run the installer again after updating the bridge.
 
 Short browser network interruptions keep the same upstream call open for up to
 eight seconds. The browser reattaches with a per-call token and replays missed
-output in order. A small playback buffer absorbs ordinary packet jitter.
+output in order.
+
+Audio path on this route (0.2.6): the bridge tags each 20 ms output frame with
+its media position and sends one empty mark instead of a silent stretch. The
+browser plays a single continuous stream from an AudioWorklet (a ScriptProcessor
+if the page refuses worklets): the target delay follows the arrival jitter of
+the last 30 s (60-500 ms), a late frame fades out and back in, and pauses are
+lengthened or shortened so delay never accumulates after a stall. The caller's
+microphone also runs on a worklet. The bridge keeps at most a 60-240 ms mic
+backlog, dropping silent frames first and then the oldest audio, so a burst
+after a stall or a reconnect cannot delay the caller for the rest of the call.
+Playback stops on the first transcript of the caller's speech; there is no
+volume-based ducking, because the microphone also hears the assistant.
+Reinstall the bridge after updating; the browser falls back to the previous
+fixed 140 ms start when it receives audio without positions.
 Ending the call disconnects immediately when the browser is online.
 
-Hold the Voice Mode button for half a second with a mouse or finger to open Voice and language. Right-click and Shift+F10 also open it. A short press starts the call. During a call the waveform/status opens the same settings. Apply both choices together to restart once in the same thread with the microphone mute state preserved. Cancel keeps the current call. Russian is the initial language; Auto listens first and follows the caller's language. Codex Live keeps the selected ChatGPT voice (Cove by default).
+Hold the Voice Mode button for half a second with a mouse or finger to open Voice and language. Right-click and Shift+F10 also open it. A short press starts the call. During a call the waveform/status opens the same settings. Apply both choices together to restart once in the same thread with the microphone mute state preserved. Cancel keeps the current call. Russian is the initial language; Auto listens first and follows the caller's language. Codex Live keeps the selected ChatGPT voice (Cove by default). The backend honours every listed voice, but they differ mainly in pitch: Cove, Arbor, Ember and Spruce are low and sound alike, Sol, Breeze and Vale are middle, Maple and Juniper are high; the selector shows this.

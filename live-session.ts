@@ -155,7 +155,8 @@ export class LiveSession {
     }
     if (!this.ready) return;
     if (event.type === "session.output_audio.delta" && typeof event.delta === "string") {
-      this.hooks.browser({ type: "AUDIO", base64Data: event.delta });
+      const pts = typeof event.pts === "number" && Number.isFinite(event.pts) ? event.pts : undefined;
+      this.hooks.browser(pts === undefined ? { type: "AUDIO", base64Data: event.delta } : { type: "AUDIO", base64Data: event.delta, pts });
       return;
     }
     if (event.type === "session.delegation.transcribed" && typeof event.delegation_id === "string") {

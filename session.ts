@@ -132,14 +132,20 @@ export class VoiceSession {
           if (message.badge) this.set({ badge: message.badge });
           const player = new Player(message.outputHz);
           this.player = player;
+          // The Live 1.1 bridge streams continuously, so "speaking" follows
+          // what is audible rather than the arrival of audio messages.
+          player.onActive = () => {
+            if (this.state.phase === "listening") this.set({ phase: "speaking" });
+          };
           player.onIdle = () => {
             if (this.state.phase === "speaking") this.set({ phase: "listening" });
           };
           try {
             stopMic = await startMic(message.inputHz, () => this.state.muted, (base64Data, rms) => {
               send({ type: "AUDIO", base64Data });
+              // Only the server's turn detection interrupts playback. Volume
+              // alone mistakes taps, bumps and the assistant's own echo for speech.
               this.micLevel = rms;
-              player.micLevel(rms, this.state.muted);
             });
             // The user may have ended the session while the permission prompt was open.
             if (ended) {
@@ -159,8 +165,7 @@ export class VoiceSession {
           this.set({ route: message.message, badge: message.switching ? "R2.1…" : "R2.1", phase: message.switching || !this.player ? "connecting" : "listening" });
           break;
         case "AUDIO":
-          this.player?.enqueue(message.base64Data);
-          if (this.state.phase !== "speaking") this.set({ phase: "speaking" });
+          this.player?.enqueue(message.base64Data, message.pts);
           break;
         case "INTERRUPTION":
           this.player?.interrupt();

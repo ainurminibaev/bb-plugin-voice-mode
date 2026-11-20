@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useSdk, useSettings } from "@get-bb/plugin-sdk/app";
-import { LANGUAGES, LIVE_VOICES, REALTIME_VOICES, speechLanguage } from "./live-voices";
+import { LANGUAGES, LIVE_VOICE_PITCH, LIVE_VOICES, REALTIME_VOICES, speechLanguage } from "./live-voices";
 import type { VoiceSession } from "./session";
 
 type Trigger = ButtonHTMLAttributes<HTMLButtonElement> & { "data-voice-options-trigger": string };
@@ -117,8 +117,10 @@ function OptionsDialog({ session, dismiss }: { session?: VoiceSession; dismiss()
     <form onSubmit={e => { e.preventDefault(); e.stopPropagation(); void save(); }}>
       <h2>Голос и язык</h2>
       <label>Голос<select disabled={!values || saving} value={voice ?? currentVoice} onChange={e => setVoice(e.target.value)}>
-        {(codex ? LIVE_VOICES : REALTIME_VOICES).map(v => <option key={v} value={v}>{v[0].toUpperCase() + v.slice(1)}</option>)}
+        {(codex ? LIVE_VOICES : REALTIME_VOICES).map(v => <option key={v} value={v}>
+          {v[0].toUpperCase() + v.slice(1)}{codex ? ` · ${LIVE_VOICE_PITCH[v as keyof typeof LIVE_VOICE_PITCH]}` : ""}</option>)}
       </select></label>
+      {codex && <small>Голоса различаются в основном высотой. Низкие (Cove, Arbor, Ember, Spruce) звучат похоже.</small>}
       <label>Язык речи<select disabled={!values || saving} value={language ?? currentLanguage} onChange={e => setLanguage(e.target.value)}>
         {Object.entries(LANGUAGES).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
       </select></label>

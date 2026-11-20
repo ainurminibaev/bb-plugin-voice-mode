@@ -53,7 +53,9 @@ keeps the BB thread and microphone but starts a fresh voice conversation.
 
 During a Live call, a posted assistant reply to a spoken question can be read aloud while the BB thread continues working. Tool output and private reasoning are excluded.
 
-For Codex subscription Live 1.1, install the server bridge with `python3 codex_voice.py --install` and select `codex-live-first`. Verify the Live 1.1 badge, voiced thread reply and Realtime fallback.
+For Codex subscription Live 1.1, install the server bridge with `python3 codex_voice.py --install` and select `codex-live-first`. Verify the Live 1.1 badge, voiced thread reply and Realtime fallback. Rerun the installer after each plugin update: version 0.2.6 bridges send media positions and bound the caller's mic backlog; an older bridge still works but plays with the previous fixed buffer.
+
+If a caller reports choppy or delayed speech, check the network first: the browser buffer adapts to jitter up to 500 ms and recovers after stalls, but cannot hide outages longer than that. Live 1.1 voices differ mainly in pitch; Cove, Arbor, Ember and Spruce sound alike.
 
 Brief browser disconnects can resume the same call. The server keeps the call
 for eight seconds and replays missed output within a bounded buffer. After a

@@ -886,6 +886,25 @@ it("starts 1.1 through Codex without a key and retains the subscription fallback
   await browser.close();
 });
 
+it("forwards Live 1.1 media positions and silence marks, and interrupts on the caller's first words", async () => {
+  const { toBrowser, browser } = await startSession({ subscription: true, settings: { connection: "codex-live-first" } });
+  const live = FakeUpstream.last!;
+  live.open();
+  live.emit({ type: "session.started" });
+  live.emit({ type: "session.output_audio.delta", delta: "AQI=", pts: 480 });
+  live.emit({ type: "session.output_audio.delta", delta: "", pts: 960 });
+  live.emit({ type: "session.output_transcript.delta", event_id: "a1", delta: "Один", start_ms: 0, end_ms: 200 });
+  await flush();
+  expect(toBrowser()).toContainEqual({ type: "AUDIO", base64Data: "AQI=", pts: 480 });
+  expect(toBrowser()).toContainEqual({ type: "AUDIO", base64Data: "", pts: 960 });
+  expect(toBrowser().some(e => e.type === "INTERRUPTION")).toBe(false);
+  live.emit({ type: "session.input_transcript.delta", event_id: "u1", delta: "Стоп", start_ms: 300, end_ms: 500 });
+  live.emit({ type: "session.input_transcript.delta", event_id: "u2", delta: " подожди", start_ms: 500, end_ms: 700 });
+  await flush();
+  expect(toBrowser().filter(e => e.type === "INTERRUPTION")).toHaveLength(1);
+  await browser.close();
+});
+
 describe("short network interruptions", () => {
   it("replays only missing audio and keeps the same upstream; END closes it", async () => {
     const { browser, toBrowser, harness } = await startSession({ buffered: true, connectionPlugin: true });

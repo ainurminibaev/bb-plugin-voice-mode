@@ -1,2 +1,5 @@
 dist/
 node_modules/
+__pycache__/
+bench/.build/
+bench/results_*.json
