@@ -119,6 +119,9 @@ export class VoiceSession {
         case "READY": {
           const player = new Player(message.outputHz);
           this.player = player;
+          player.onActive = () => {
+            if (this.state.phase === "listening") this.set({ phase: "speaking" });
+          };
           player.onIdle = () => {
             if (this.state.phase === "speaking") this.set({ phase: "listening" });
           };
@@ -146,8 +149,7 @@ export class VoiceSession {
           break;
         }
         case "AUDIO":
-          this.player?.enqueue(message.base64Data);
-          if (this.state.phase !== "speaking") this.set({ phase: "speaking" });
+          this.player?.enqueue(message.base64Data, message.pts);
           break;
         case "INTERRUPTION":
           this.player?.interrupt();
