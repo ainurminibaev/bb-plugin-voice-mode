@@ -203,6 +203,16 @@ const allListeners = new Set<() => void>();
 function notifyAll() {
   for (const listener of allListeners) listener();
 }
+/** Snapshot for the local settings panel, updated by the same events as the call UI. */
+export function activeCallRoute(): string {
+  for (const { state } of sessions.values()) {
+    if (!isLive(state.phase)) continue;
+    if (state.phase === "connecting") return state.badge === "R2.1…" ? "Connecting to Realtime 2.1" : "Connecting";
+    return state.badge === "Live" ? "Connected · Live 1" : state.badge === "R2.1" ? "Connected · Realtime 2.1" : state.badge ? "Connected · " + state.badge : "Connected · Realtime";
+  }
+  return "No active call in this client";
+}
+
 export function subscribeAll(listener: () => void) {
   allListeners.add(listener);
   return () => void allListeners.delete(listener);

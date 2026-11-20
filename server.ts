@@ -196,7 +196,8 @@ export default function plugin(bb: BbPluginApi) {
       options: [...MODELS],
       default: MODELS[0],
     },
-    voice: { type: "select", label: "Voice", options: [...VOICES], default: "marin" },
+    codexLiveVoice: { type: "select", label: "Live 1.1 voice (Codex)", options: ["cove", "juniper", "arbor", "breeze", "ember", "maple", "sol", "spruce", "vale"], default: "cove" },
+    voice: { type: "select", label: "Live 1 / Realtime voice (including fallback)", options: [...VOICES], default: "marin" },
     widgetStyle: {
       type: "select",
       label: "Away-from-thread widget",
@@ -709,7 +710,7 @@ export default function plugin(bb: BbPluginApi) {
             if (unavailable) liveUnavailable(error);
             else fail(error);
           },
-        }, connection.protocol === "codex-live" ? "cove" : voice, "Greet the caller briefly, then listen.", connection.model);
+        }, voice, "Greet the caller briefly, then listen.", connection.model);
       }
       socket.onopen = () => {
         if (closed || socket !== upstream) return;
@@ -792,7 +793,7 @@ export default function plugin(bb: BbPluginApi) {
       endActiveSession = shutdown;
       if (current.connection === "live-first" && !current.openaiApiKey?.trim()) return switchToSubscription("No Live key configured.");
       const connection = await resolveConnection();
-      if (!closed) connect(connection, current.voice, connection.source.startsWith("plugin"));
+      if (!closed) connect(connection, connection.protocol === "codex-live" ? current.codexLiveVoice : current.voice, connection.source.startsWith("plugin"));
     }
 
     return {

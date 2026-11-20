@@ -36,7 +36,7 @@ Choose a voice route in **Settings → Plugins → Voice Mode**.
 | GPT-Live-1 | `openai-live` or `live-first` | Project API key. Choose `openai-live` for Live only, or `live-first` to fall back to subscription Realtime 2.1. |
 | Realtime 2.1 directly | `plugin` | Configure ChatGPT Realtime Connection (`codex-realtime`) for `gpt-realtime-2.1` and ensure discovery selects it. |
 
-The connection menu displays model names and sign-in methods. The Direct Realtime API model field applies only to direct API calls. Each call starts with the selected route. The two Live modes with fallback go directly to Realtime 2.1 when their primary route is unavailable. The generic `auto` and direct Realtime API-key modes are described below.
+In settings, **Voice route and Realtime providers** shows the next call sequence, the current call in this client, and detected providers. Discovery checks plugin availability; a connected call confirms a live session. Live 1.1 has a separate voice selection. Live 1 and Realtime share the other voice setting, including after fallback. The connection menu displays model names and sign-in methods. The Direct Realtime API model field applies only to direct API calls. Each call starts with the selected route. The two Live modes with fallback go directly to Realtime 2.1 when their primary route is unavailable. The generic `auto` and direct Realtime API-key modes are described below.
 
 - **Realtime with an OpenAI API key** — set `openaiApiKey`. Choose `model` (`gpt-realtime-2`
   by default) and `voice`. The key is only ever sent to
@@ -215,4 +215,4 @@ bb plugin build && bb plugin install . --yes
 
 On the BB server, install a Codex CLI with V3 realtime app-server support and sign in using the account that runs BB. Confirm the login with `codex login status`. From the matching plugin sources, run `python3 codex_voice.py --install` as that same user. This creates a local Python environment and installs the WebRTC bridge. Repeat this step after bridge updates.
 
-Select **codex-live-first** in Voice Mode and start a call. The **Live 1.1** badge identifies the route requesting `gpt-live-1.1-codex` with the Cove voice. The browser sends audio to BB, and the local bridge connects to the model via WebRTC. Spoken tasks go to the current BB thread. This route uses the server's Codex login. For fallback, configure the ChatGPT Realtime Connection plugin for `gpt-realtime-2.1`. The existing project-key routes remain available.
+Select **codex-live-first** in Voice Mode and start a call. The **Live 1.1** badge identifies the route requesting `gpt-live-1.1-codex` with the selected Codex Live voice. The browser sends audio to BB, and the local bridge connects to the model via WebRTC. Spoken tasks go to the current BB thread. This route uses the server's Codex login. For fallback, configure the ChatGPT Realtime Connection plugin for `gpt-realtime-2.1`. The existing project-key routes remain available.
