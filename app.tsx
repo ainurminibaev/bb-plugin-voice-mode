@@ -957,7 +957,7 @@ export default definePluginApp((app) => {
   // known connection plugins get links and install commands here.
   app.slots.settingsSection({
     id: "connection-plugins",
-    title: "Connection plugins",
+    title: "Voice route and Realtime providers",
     description: "For the Realtime 2.1 subscription fallback, configure ChatGPT Realtime Connection. Codex Live 1.1 uses the local Codex CLI.",
     component: ConnectionPluginsSection,
   });

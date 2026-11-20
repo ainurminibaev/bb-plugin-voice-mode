@@ -70,7 +70,7 @@ Choose a voice route in **Settings → Plugins → Voice Mode**.
 | GPT-Live-1 | `openai-live` or `live-first` | Project API key. Choose `openai-live` for Live only, or `live-first` to fall back to subscription Realtime 2.1. |
 | Realtime 2.1 directly | `plugin` | Configure ChatGPT Realtime Connection (`codex-realtime`) for `gpt-realtime-2.1` and ensure discovery selects it. |
 
-The connection menu displays model names and sign-in methods. The Direct Realtime API model field applies only to direct API calls. Each call starts with the selected route. The two Live modes with fallback go directly to Realtime 2.1 when their primary route is unavailable. The generic `auto` and direct Realtime API-key modes are described below.
+In settings, **Voice route and Realtime providers** shows the next call sequence, the current call in this client, and detected providers. Discovery checks plugin availability; a connected call confirms a live session. Live 1.1 has a separate voice selection. Live 1 and Realtime share the other voice setting, including after fallback. The connection menu displays model names and sign-in methods. The Direct Realtime API model field applies only to direct API calls. Each call starts with the selected route. The two Live modes with fallback go directly to Realtime 2.1 when their primary route is unavailable. The generic `auto` and direct Realtime API-key modes are described below.
 
 - **Realtime with an OpenAI API key** — set `openaiApiKey`. Choose `model` (`gpt-realtime-2`
   by default) and `voice`. The key is only ever sent to

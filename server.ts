@@ -246,7 +246,7 @@ export default function plugin(bb: BbPluginApi) {
     },
     speechLanguage: { type: "select", label: "Spoken language", options: Object.keys(LANGUAGES), default: "ru" },
     codexLiveVoice: { type: "select", label: "Live 1.1 voice (Codex)", options: [...LIVE_VOICES], default: "cove" },
-    voice: { type: "select", label: "Voice", options: [...VOICES], default: "marin" },
+    voice: { type: "select", label: "Live 1 / Realtime voice (including fallback)", options: [...VOICES], default: "marin" },
     vadThreshold: {
       type: "number", label: "Speech activation threshold",
       description: "Higher values reduce noise-triggered interruptions but may miss quiet speech. Applies to the next session.",
