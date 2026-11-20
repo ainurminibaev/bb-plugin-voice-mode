@@ -37,6 +37,10 @@ class FakeUpstream {
   }
 }
 
+vi.mock("../codex-voice-socket", () => ({
+  CodexVoiceSocket: class { constructor() { return new FakeUpstream("codex-app-server", {}); } },
+}));
+
 beforeEach(() => {
   FakeUpstream.last = null;
   vi.stubGlobal("WebSocket", Object.assign(FakeUpstream, { OPEN: 1 }));
@@ -72,6 +76,7 @@ async function startSession(options: {
         get: async () => ({ status: "idle", title: "Fix the build", ...options.thread }),
         output: async () => ({ output: "Build is green." }),
         send: async () => ({}),
+        events: { list: async () => [] },
         stop: async () => ({}),
         interactions: { list: async () => options.interactions ?? [] },
       },
@@ -720,4 +725,20 @@ describe("Live first with subscription fallback", () => {
     second.onerror?.(); await flush();
     expect(FakeUpstream.last).toBe(second);
   });
+});
+
+
+it("starts 1.1 through Codex without a key and retains the subscription fallback", async () => {
+  const { toBrowser, browser } = await startSession({ subscription: true, settings: { connection: "codex-live-first" } });
+  const first = FakeUpstream.last!;
+  expect(first.url).toBe("codex-app-server");
+  first.open();
+  expect(first.ofType("session.start")[0]).toMatchObject({ session: { model: "gpt-live-1.1-codex" } });
+  first.emit({ type: "session.started" });
+  expect(toBrowser()).toContainEqual({ type: "READY", inputHz: 24000, outputHz: 24000, badge: "Live 1.1" });
+  first.onclose?.({code:1006, reason:"disconnected"});
+  await flush();
+  expect(FakeUpstream.last!.url).toMatch(/gpt-realtime-2\.1$/);
+  expect(toBrowser().filter(e => e.type === "READY")).toHaveLength(1);
+  await browser.close();
 });

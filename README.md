@@ -213,3 +213,9 @@ npm install
 npm run typecheck && npm test
 bb plugin build && bb plugin install . --yes
 ```
+
+### Codex Live 1.1 with ChatGPT sign-in
+
+On the BB server, install a Codex CLI with V3 realtime app-server support and sign in using the account that runs BB. Confirm the login with `codex login status`. From the matching plugin sources, run `python3 codex_voice.py --install` as that same user. This creates a local Python environment and installs the WebRTC bridge. Repeat this step after bridge updates.
+
+Select **codex-live-first** in Voice Mode and start a call. The **Live 1.1** badge identifies the route requesting `gpt-live-1.1-codex` with the Cove voice. The browser sends audio to BB, and the local bridge connects to the model via WebRTC. Spoken tasks go to the current BB thread. This route uses the server's Codex login. For fallback, configure the ChatGPT Realtime Connection plugin for `gpt-realtime-2.1`. The existing project-key routes remain available.
