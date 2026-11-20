@@ -4,7 +4,11 @@ This fork of [Steve Frost’s Voice Mode](https://github.com/steveafrost/bb-plug
 keeps the original MIT license and the same plugin ID. The `main`
 branch carries Russian conversational instructions, a compact new-thread launch
 button, microphone-ready greetings, noise controls and honest pending-work status.
-The upstream contribution branch contains only the general waiting/status fix.
+General fixes are offered upstream as separate
+[pull requests](https://github.com/steveafrost/bb-plugin-voice-mode/pulls?q=is%3Apr+author%3Aainurminibaev);
+the Codex-login Live 1.1 bridge and the personal settings stay in this fork.
+Release notes for every version are on the
+[releases page](https://github.com/ainurminibaev/bb-plugin-voice-mode/releases).
 
 Install stable releases with `bb plugin install git:https://github.com/ainurminibaev/bb-plugin-voice-mode.git@^0.2.0 --yes`.
 BB checks compatible tags; use its Plugins updates screen or `bb plugin update voice-mode`.
@@ -278,5 +282,24 @@ volume-based ducking, because the microphone also hears the assistant.
 Reinstall the bridge after updating; the browser falls back to the previous
 fixed 140 ms start when it receives audio without positions.
 Ending the call disconnects immediately when the browser is online.
+
+The assistant still talks for roughly a second after the caller starts: GPT-Live
+gives no earlier speech signal than the caller's transcript, and the plugin does
+not cut its remaining reply on its own. Jitter spikes above about 250 ms remain
+audible, and the first seconds of a call on a poor network can still break up
+while the buffer learns the jitter.
+
+Update and rollback on the BB server:
+
+```sh
+bb plugin update voice-mode
+python3 "$(bb plugin list --json | python3 -c 'import json,sys; print(next(p["rootDir"] for p in json.load(sys.stdin)["plugins"] if p["id"] == "voice-mode"))')/codex_voice.py" --install
+# rollback to the previous release, then run the same installer line again
+bb plugin install git:https://github.com/ainurminibaev/bb-plugin-voice-mode.git@v0.2.5 --yes
+```
+
+Return to tracking releases with `@^0.2.0` afterwards. Restart an active call
+after either step; the browser and the bridge of 0.2.5 and 0.2.6 interoperate,
+with 0.2.6 behaviour only when both sides are 0.2.6.
 
 Hold the Voice Mode button for half a second with a mouse or finger to open Voice and language. Right-click and Shift+F10 also open it. A short press starts the call. During a call the waveform/status opens the same settings. Apply both choices together to restart once in the same thread with the microphone mute state preserved. Cancel keeps the current call. Russian is the initial language; Auto listens first and follows the caller's language. Codex Live keeps the selected ChatGPT voice (Cove by default). The backend honours every listed voice, but they differ mainly in pitch: Cove, Arbor, Ember and Spruce are low and sound alike, Sol, Breeze and Vale are middle, Maple and Juniper are high; the selector shows this.
