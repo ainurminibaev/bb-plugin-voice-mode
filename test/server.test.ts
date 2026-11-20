@@ -1303,7 +1303,8 @@ describe("gpt-live", () => {
     await settle();
     expect(harness.sdk.callsTo("threads.stop")).toHaveLength(1);
     const byId = Object.fromEntries(outputs(upstream).map((o) => [o.call_id, o.output]));
-    expect(byId.s1).toMatch(/waiting for the user.*Build is green/);
+    expect(byId.s1).toMatch(/waiting for the user.*answer or approve/);
+    expect(byId.s1).not.toContain("Build is green");
     expect(byId.s2).toBe("The agent was stopped.");
   });
 
